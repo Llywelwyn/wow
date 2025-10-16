@@ -58,6 +58,42 @@ WHERE key = ?
 	return meta, nil
 }
 
+// ListMetadata retrieves all metadata rows ordered from newest to oldest.
+func ListMetadata(ctx context.Context, db *sql.DB) ([]model.Metadata, error) {
+	const query = `
+SELECT key, type, created, modified, description, tags
+FROM snippets
+ORDER BY created DESC
+`
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list metadata: %w", err)
+	}
+	defer rows.Close()
+
+	var result []model.Metadata
+	for rows.Next() {
+		var meta model.Metadata
+		if err := rows.Scan(
+			&meta.Key,
+			&meta.Type,
+			&meta.Created,
+			&meta.Modified,
+			&meta.Description,
+			&meta.Tags,
+		); err != nil {
+			return nil, fmt.Errorf("scan metadata row: %w", err)
+		}
+		result = append(result, meta)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate metadata: %w", err)
+	}
+
+	return result, nil
+}
+
 func sqliteIsUniqueError(err error) bool {
 	var se sqlite3.Error
 	if !errors.As(err, &se) {
