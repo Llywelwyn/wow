@@ -79,6 +79,7 @@ func normalizeDir(dir string) (string, error) {
 
 // expandHome returns a given path with preceding tilde replaced with $HOME.
 // If $HOME does not exist, it errors.
+// Currently does not handle expanding home of other users. e.g. ~username
 func expandHome(path string) (string, error) {
 	if !strings.HasPrefix(path, "~") {
 		return path, nil
