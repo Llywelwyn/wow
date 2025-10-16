@@ -90,3 +90,45 @@ func TestGetMetadataNotFound(t *testing.T) {
 		t.Fatalf("expected ErrMetadataNotFound, got %v", err)
 	}
 }
+
+func TestListMetadataOrdersByCreatedDesc(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "meta.db")
+
+	db, err := InitMetaDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitMetaDB error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	base := time.Unix(1_700_000_000, 0)
+	entries := []model.Metadata{
+		{Key: "first", Type: "text", Created: base.Add(-2 * time.Hour), Modified: base.Add(-2 * time.Hour)},
+		{Key: "second", Type: "text", Created: base.Add(-1 * time.Hour), Modified: base.Add(-1 * time.Hour)},
+		{Key: "third", Type: "url", Created: base, Modified: base},
+	}
+
+	for _, meta := range entries {
+		if err := InsertMetadata(ctx, db, meta); err != nil {
+			t.Fatalf("InsertMetadata %q error = %v", meta.Key, err)
+		}
+	}
+
+	list, err := ListMetadata(ctx, db)
+	if err != nil {
+		t.Fatalf("ListMetadata error = %v", err)
+	}
+
+	if len(list) != len(entries) {
+		t.Fatalf("ListMetadata len = %d, want %d", len(list), len(entries))
+	}
+
+	wantOrder := []string{"third", "second", "first"}
+	for i, key := range wantOrder {
+		if list[i].Key != key {
+			t.Fatalf("ListMetadata[%d].Key = %q, want %q", i, list[i].Key, key)
+		}
+	}
+}
