@@ -1,3 +1,6 @@
+// storage manages storage of snips and their metadata.
+// It handles the creation and fetching of the meta SQLite db,
+// and ensuring the existence (or creating) required directories.
 package storage
 
 import (
