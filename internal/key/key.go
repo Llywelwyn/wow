@@ -19,10 +19,32 @@ var (
 	ErrBadRune    = errors.New("key contains an unsupported character")
 )
 
-// Normalize trims and validates the provided key.
+// ResolvePath converts a normalized key into an absolute path under the provided base directory.
+// It ensures the resolved path does not escape the base directory.
+func ResolvePath(baseDir, key string) (string, error) {
+	normalized, err := normalizeKey(key)
+	if err != nil {
+		return "", err
+	}
+
+	full := filepath.Join(baseDir, filepath.FromSlash(normalized))
+	clean := filepath.Clean(full)
+
+	rel, err := filepath.Rel(baseDir, clean)
+	if err != nil {
+		return "", fmt.Errorf("resolve key %q: %w", key, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", ErrTraversal
+	}
+
+	return clean, nil
+}
+
+// normalizeKey trims and validates the provided key.
 // It returns the normalized representation
 // or an error if the key is invalid.
-func Normalize(raw string) (string, error) {
+func normalizeKey(raw string) (string, error) {
 	key := strings.TrimSpace(raw)
 	if key == "" {
 		return "", ErrEmpty
@@ -44,28 +66,6 @@ func Normalize(raw string) (string, error) {
 	}
 
 	return key, nil
-}
-
-// Resolve converts a normalized key into an absolute path under the provided base directory.
-// It ensures the resolved path does not escape the base directory.
-func Resolve(baseDir, key string) (string, error) {
-	normalized, err := Normalize(key)
-	if err != nil {
-		return "", err
-	}
-
-	full := filepath.Join(baseDir, filepath.FromSlash(normalized))
-	clean := filepath.Clean(full)
-
-	rel, err := filepath.Rel(baseDir, clean)
-	if err != nil {
-		return "", fmt.Errorf("resolve key %q: %w", key, err)
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", ErrTraversal
-	}
-
-	return clean, nil
 }
 
 // validateSegment checks if a key segment is valid.
