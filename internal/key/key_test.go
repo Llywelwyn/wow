@@ -52,7 +52,7 @@ func TestResolveProducesSafePath(t *testing.T) {
 		t.Fatalf("Resolve(%q, %q) error = %v", base, tc, err)
 	}
 
-	want := filepath.Join(base, "auto", tc)
+	want := filepath.Join(base, tc)
 	if have != want {
 		t.Fatalf("Resolve(%q, %q) = %q, want %q", base, tc, have, want)
 	}
