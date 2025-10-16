@@ -16,6 +16,12 @@ func NewDispatcher() *Dispatcher {
 
 // Register makes the command available to the Dispatcher.
 func (d *Dispatcher) Register(cmd Command) {
+	if cmd == nil {
+		panic("cannot register nil command")
+	}
+	if _, exists := d.registry[cmd.Name()]; exists {
+		panic("cannot register the same command twice")
+	}
 	d.registry[cmd.Name()] = cmd
 }
 
@@ -24,15 +30,13 @@ func (d *Dispatcher) Dispatch(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("%w: default command pending", ErrNotYetImplemented)
 	}
-
 	name := args[0]
 	cmd, ok := d.registry[name]
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownCommand, name)
 	}
-
 	if err := cmd.Execute(args[1:]); err != nil {
-		return err
+		return fmt.Errorf("command %q failed: %w", name, err)
 	}
 	return nil
 }
