@@ -61,7 +61,7 @@ func (s *Saver) Save(ctx context.Context, req SaveRequest) (SaveResult, error) {
 	contentType := detectType(payload)
 	now := s.Now()
 
-	resolvedKey, err := s.resolveKey(ctx, req.Key, now)
+	resolvedKey, err := s.resolveKey(req.Key, now)
 	if err != nil {
 		return SaveResult{}, err
 	}
@@ -107,9 +107,9 @@ func (s *Saver) Save(ctx context.Context, req SaveRequest) (SaveResult, error) {
 	}, nil
 }
 
-func (s *Saver) resolveKey(ctx context.Context, rawKey string, now time.Time) (string, error) {
+func (s *Saver) resolveKey(rawKey string, now time.Time) (string, error) {
 	if strings.TrimSpace(rawKey) != "" {
-		return key.Normalize(rawKey)
+		return rawKey, nil
 	}
 
 	cb := func(candidate string) (bool, error) {

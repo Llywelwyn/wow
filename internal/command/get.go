@@ -30,13 +30,7 @@ func (c *GetCommand) Execute(args []string) error {
 		return errors.New("key required")
 	}
 
-	rawKey := args[0]
-	normalized, err := key.Normalize(rawKey)
-	if err != nil {
-		return err
-	}
-
-	path, err := key.ResolvePath(c.BaseDir, normalized)
+	path, err := key.ResolvePath(c.BaseDir, args[0])
 	if err != nil {
 		return err
 	}
