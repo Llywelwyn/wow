@@ -2,8 +2,8 @@ package model
 
 import "time"
 
-// Snippet represents metadata stored in the database.
-type Snippet struct {
+// Metadata captures descriptive fields persisted alongside snippet contents.
+type Metadata struct {
 	Key         string
 	Type        string
 	Created     time.Time

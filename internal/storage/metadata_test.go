@@ -9,7 +9,7 @@ import (
 	"github.com/llywelwyn/wow/internal/model"
 )
 
-func TestInsertAndGetSnippet(t *testing.T) {
+func TestInsertAndGetMetadata(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "meta.db")
 
@@ -22,7 +22,7 @@ func TestInsertAndGetSnippet(t *testing.T) {
 	})
 
 	now := time.Unix(1_700_000_000, 0)
-	sn := model.Snippet{
+	meta := model.Metadata{
 		Key:         "go/foo",
 		Type:        "text",
 		Created:     now,
@@ -31,21 +31,21 @@ func TestInsertAndGetSnippet(t *testing.T) {
 		Tags:        "tag1,tag2",
 	}
 
-	if err := InsertSnippet(ctx, db, sn); err != nil {
-		t.Fatalf("InsertSnippet error = %v", err)
+	if err := InsertMetadata(ctx, db, meta); err != nil {
+		t.Fatalf("InsertMetadata error = %v", err)
 	}
 
-	got, err := GetSnippet(ctx, db, "go/foo")
+	got, err := GetMetadata(ctx, db, "go/foo")
 	if err != nil {
-		t.Fatalf("GetSnippet error = %v", err)
+		t.Fatalf("GetMetadata error = %v", err)
 	}
 
-	if got.Key != sn.Key || got.Type != sn.Type {
-		t.Fatalf("GetSnippet = %+v, want %+v", got, sn)
+	if got.Key != meta.Key || got.Type != meta.Type {
+		t.Fatalf("GetMetadata = %+v, want %+v", got, meta)
 	}
 }
 
-func TestInsertSnippetDuplicate(t *testing.T) {
+func TestInsertMetadataDuplicate(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "meta.db")
 
@@ -58,23 +58,23 @@ func TestInsertSnippetDuplicate(t *testing.T) {
 	})
 
 	now := time.Unix(1_700_000_000, 0)
-	sn := model.Snippet{
+	meta := model.Metadata{
 		Key:      "dup/key",
 		Type:     "text",
 		Created:  now,
 		Modified: now,
 	}
 
-	if err := InsertSnippet(ctx, db, sn); err != nil {
+	if err := InsertMetadata(ctx, db, meta); err != nil {
 		t.Fatalf("first insert error = %v", err)
 	}
 
-	if err := InsertSnippet(ctx, db, sn); err != ErrSnippetDuplicate {
-		t.Fatalf("second insert error = %v, want ErrSnippetDuplicate", err)
+	if err := InsertMetadata(ctx, db, meta); err != ErrMetadataDuplicate {
+		t.Fatalf("second insert error = %v, want ErrMetadataDuplicate", err)
 	}
 }
 
-func TestGetSnippetNotFound(t *testing.T) {
+func TestGetMetadataNotFound(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "meta.db")
 
@@ -86,7 +86,7 @@ func TestGetSnippetNotFound(t *testing.T) {
 		_ = db.Close()
 	})
 
-	if _, err := GetSnippet(ctx, db, "missing"); err != ErrSnippetNotFound {
-		t.Fatalf("expected ErrSnippetNotFound, got %v", err)
+	if _, err := GetMetadata(ctx, db, "missing"); err != ErrMetadataNotFound {
+		t.Fatalf("expected ErrMetadataNotFound, got %v", err)
 	}
 }
