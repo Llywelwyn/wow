@@ -46,9 +46,9 @@ func Normalize(raw string) (string, error) {
 	return key, nil
 }
 
-// Resolve converts a normalized key into an absolute path under the provided base directory.
+// ResolvePath converts a normalized key into an absolute path under the provided base directory.
 // It ensures the resolved path does not escape the base directory.
-func Resolve(baseDir, key string) (string, error) {
+func ResolvePath(baseDir, key string) (string, error) {
 	normalized, err := Normalize(key)
 	if err != nil {
 		return "", err
