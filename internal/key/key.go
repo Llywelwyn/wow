@@ -33,8 +33,8 @@ func Normalize(raw string) (string, error) {
 		return "", fmt.Errorf("%w: empty segment", ErrBadSegment)
 	}
 
-	segments := strings.Split(key, "/")
-	for _, seg := range segments {
+	segments := strings.SplitSeq(key, "/")
+	for seg := range segments {
 		if err := validateSegment(seg); err != nil {
 			return "", err
 		}
