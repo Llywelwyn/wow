@@ -23,7 +23,7 @@ func TestDispatchNilReturnsNotYetImplemented(t *testing.T) {
 	d := NewDispatcher()
 	err := d.Dispatch(nil)
 	if !errors.Is(err, ErrNotYetImplemented) {
-		t.Fatalf("expected ErrNotImplemented, got %v", err)
+		t.Fatalf("expected ErrNotYetImplemented, got %v", err)
 	}
 }
 
