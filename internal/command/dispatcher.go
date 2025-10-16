@@ -19,10 +19,14 @@ func (d *Dispatcher) Register(cmd Command) {
 	if cmd == nil {
 		panic("cannot register nil command")
 	}
-	if _, exists := d.registry[cmd.Name()]; exists {
+	name := cmd.Name()
+	if name == "" {
+		panic("command name must not be empty")
+	}
+	if _, exists := d.registry[name]; exists {
 		panic("cannot register the same command twice")
 	}
-	d.registry[cmd.Name()] = cmd
+	d.registry[name] = cmd
 }
 
 // Dispatch selects a command based on args and invokes it.
@@ -31,7 +35,7 @@ func (d *Dispatcher) Dispatch(args []string) error {
 		return fmt.Errorf("%w: default command pending", ErrNotYetImplemented)
 	}
 	name := args[0]
-	cmd, ok := d.registry[name]
+	cmd, ok := d.Lookup(name)
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownCommand, name)
 	}
@@ -39,4 +43,10 @@ func (d *Dispatcher) Dispatch(args []string) error {
 		return fmt.Errorf("command %q failed: %w", name, err)
 	}
 	return nil
+}
+
+// Lookup returns the command registered under the provided name.
+func (d *Dispatcher) Lookup(name string) (Command, bool) {
+	cmd, ok := d.registry[name]
+	return cmd, ok
 }

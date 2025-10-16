@@ -51,3 +51,21 @@ func TestDispatcherInvokesRegisteredCommand(t *testing.T) {
 		t.Fatalf("expected forwarded args, got %v", cmd.args)
 	}
 }
+
+func TestDispatcherLookup(t *testing.T) {
+	cmd := &stubCommand{name: "save"}
+	d := NewDispatcher()
+	d.Register(cmd)
+
+	found, ok := d.Lookup("save")
+	if !ok {
+		t.Fatalf("expected to find registered command")
+	}
+	if found != cmd {
+		t.Fatalf("lookup returned unexpected command")
+	}
+
+	if _, ok := d.Lookup("missing"); ok {
+		t.Fatalf("expected lookup to fail for missing command")
+	}
+}
