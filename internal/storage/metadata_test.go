@@ -30,6 +30,8 @@ func TestInsertAndGetMetadata(t *testing.T) {
 		Description: "desc",
 		Tags:        "tag1,tag2",
 	}
+	meta.Created = meta.Created.UTC()
+	meta.Modified = meta.Modified.UTC()
 
 	if err := InsertMetadata(ctx, db, meta); err != nil {
 		t.Fatalf("InsertMetadata error = %v", err)
@@ -40,7 +42,7 @@ func TestInsertAndGetMetadata(t *testing.T) {
 		t.Fatalf("GetMetadata error = %v", err)
 	}
 
-	if got.Key != meta.Key || got.Type != meta.Type {
+	if got != meta {
 		t.Fatalf("GetMetadata = %+v, want %+v", got, meta)
 	}
 }
