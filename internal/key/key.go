@@ -1,3 +1,6 @@
+// key manages wow keys.
+// It handles the normalisation and validation of raw input keys,
+// and it resolves normalisd keys to their absolute filepaths.
 package key
 
 import (
