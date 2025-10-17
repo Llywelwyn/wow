@@ -39,7 +39,7 @@ func run() error {
 		Input:      os.Stdin,
 		Output:     os.Stdout,
 		Clock:      time.Now,
-		EditorOpen: editor.Opener(editor.Command()),
+		EditorOpen: editor.OpenPath(editor.GetEditorFromEnv()),
 	}
 
 	saveCmd := command.NewSaveCommand(cmdCfg)
@@ -54,28 +54,40 @@ func run() error {
 	dispatcher.Register(listCmd, "ls")
 	dispatcher.Register(removeCmd, "rm")
 
+	// os.Args[0] is this script. Take the rest.
 	args := os.Args[1:]
+
 	piped, err := stdinHasData()
 	if err != nil {
 		return err
 	}
 
+	// If no args, check for stdin to save implicitly.
+	// Otherwise just print usage.
 	if len(args) == 0 {
 		if piped {
+			// echo "data" | wow
+			// Implicit save with auto-generated key.
 			return saveCmd.Execute(nil)
 		}
 		printUsage()
 		return nil
 	}
 
+	// Check for explicit command in args[0]
+	// and execute if a match is found.
 	if cmd, ok := dispatcher.Lookup(args[0]); ok {
+		// wow ls --verbose
+		// wow edit <key>
 		return cmd.Execute(args[1:])
 	}
 
+	// Implicit save or get based on stdin presence.
 	if piped {
+		// echo "func foo() {}" | wow go/foo
+		// wow go/bar < bar.go
 		return saveCmd.Execute(args)
 	}
-
 	return getCmd.Execute(args)
 }
 
