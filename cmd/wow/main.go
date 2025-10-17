@@ -8,7 +8,7 @@ import (
 
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/editor"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -33,60 +33,61 @@ func run() error {
 
 	dispatcher := command.NewDispatcher()
 
-	saver := &core.Saver{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
-		Now:     time.Now,
-	}
-	remover := &core.Remover{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
+	cmdCfg := command.Config{
+		BaseDir:    cfg.BaseDir,
+		DB:         db,
+		Input:      os.Stdin,
+		Output:     os.Stdout,
+		Clock:      time.Now,
+		EditorOpen: editor.OpenPath(editor.GetEditorFromEnv()),
 	}
 
-	saveCmd := &command.SaveCommand{
-		Saver:  saver,
-		Input:  os.Stdin,
-		Output: os.Stdout,
-	}
-	getCmd := &command.GetCommand{
-		BaseDir: cfg.BaseDir,
-		Output:  os.Stdout,
-	}
-	listCmd := &command.ListCommand{
-		DB:     db,
-		Output: os.Stdout,
-	}
-	removeCmd := &command.RemoveCommand{
-		Remover: remover,
-	}
+	saveCmd := command.NewSaveCommand(cmdCfg)
+	getCmd := command.NewGetCommand(cmdCfg)
+	editCmd := command.NewEditCommand(cmdCfg)
+	listCmd := command.NewListCommand(cmdCfg)
+	removeCmd := command.NewRemoveCommand(cmdCfg)
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
+	dispatcher.Register(editCmd)
 	dispatcher.Register(listCmd, "ls")
 	dispatcher.Register(removeCmd, "rm")
 
+	// os.Args[0] is this script. Take the rest.
 	args := os.Args[1:]
+
 	piped, err := stdinHasData()
 	if err != nil {
 		return err
 	}
 
+	// If no args, check for stdin to save implicitly.
+	// Otherwise just print usage.
 	if len(args) == 0 {
 		if piped {
+			// echo "data" | wow
+			// Implicit save with auto-generated key.
 			return saveCmd.Execute(nil)
 		}
 		printUsage()
 		return nil
 	}
 
+	// Check for explicit command in args[0]
+	// and execute if a match is found.
 	if cmd, ok := dispatcher.Lookup(args[0]); ok {
+		// wow ls --verbose
+		// wow edit <key>
 		return cmd.Execute(args[1:])
 	}
 
+	// Implicit save or get based on stdin presence.
 	if piped {
+		// echo "func foo() {}" | wow go/foo
+		// wow go/bar < bar.go
 		return saveCmd.Execute(args)
 	}
-
 	return getCmd.Execute(args)
 }
 
@@ -108,6 +109,7 @@ func printUsage() {
   wow < file                       Save snippet with auto-generated key
   wow save [key]                   Explicit save
   wow get <key>                    Explicit get
+  wow edit <key>                   Edit snippet in $WOW_EDITOR or $EDITOR
   wow list [--verbose] [--plain]   List saved snippets (alias: ls)
   wow remove <key>                 Remove snippet (alias: rm)
 `)

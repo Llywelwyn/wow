@@ -12,6 +12,16 @@ type RemoveCommand struct {
 	Remover *core.Remover
 }
 
+// NewRemoveCommand constructs a RemoveCommand using defaults from cfg.
+func NewRemoveCommand(cfg Config) *RemoveCommand {
+	return &RemoveCommand{
+		Remover: &core.Remover{
+			BaseDir: cfg.BaseDir,
+			DB:      cfg.DB,
+		},
+	}
+}
+
 // Name returns the command keyword.
 func (c *RemoveCommand) Name() string { return "remove" }
 

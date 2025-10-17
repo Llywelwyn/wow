@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
@@ -109,6 +110,33 @@ WHERE key = ?
 		return fmt.Errorf("delete metadata: rows affected: %w", err)
 	}
 	if count == 0 {
+		return ErrMetadataNotFound
+	}
+	return nil
+}
+
+// UpdateMetadata updates mutable metadata fields for the provided snippet key.
+func UpdateMetadata(ctx context.Context, db *sql.DB, meta model.Metadata) error {
+	if strings.TrimSpace(meta.Key) == "" {
+		return fmt.Errorf("update metadata: empty key")
+	}
+	if meta.Modified.IsZero() {
+		return fmt.Errorf("update metadata: modified time is zero")
+	}
+	const query = `
+UPDATE snippets
+SET type = ?, modified = ?, description = ?, tags = ?
+WHERE key = ?
+`
+	res, err := db.ExecContext(ctx, query, meta.Type, meta.Modified.UTC(), meta.Description, meta.Tags, meta.Key)
+	if err != nil {
+		return fmt.Errorf("update metadata: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update metadata: rows affected: %w", err)
+	}
+	if affected == 0 {
 		return ErrMetadataNotFound
 	}
 	return nil
