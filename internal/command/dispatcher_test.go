@@ -69,3 +69,28 @@ func TestDispatcherLookup(t *testing.T) {
 		t.Fatalf("expected lookup to fail for missing command")
 	}
 }
+
+func TestDispatcherAliasDispatch(t *testing.T) {
+	cmd := &stubCommand{name: "list"}
+	d := NewDispatcher()
+	d.Register(cmd, "ls")
+
+	if err := d.Dispatch([]string{"ls"}); err != nil {
+		t.Fatalf("Dispatch alias error = %v", err)
+	}
+	if !cmd.called {
+		t.Fatalf("expected command executed via alias")
+	}
+}
+
+func TestDispatcherRegisterAliasConflictPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic when alias collides")
+		}
+	}()
+
+	d := NewDispatcher()
+	d.Register(&stubCommand{name: "primary"})
+	d.Register(&stubCommand{name: "secondary"}, "primary")
+}
