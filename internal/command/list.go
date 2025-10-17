@@ -35,7 +35,7 @@ func (c *ListCommand) Execute(args []string) error {
 		return errors.New("list command not fully configured")
 	}
 
-	fs := flag.NewFlagSet("ls", flag.ContinueOnError)
+	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	plain := newPlainFlag()
 	fs.Var(plain, "plain", "plain output; optionally provide a delimiter (default: tab)")
