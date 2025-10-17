@@ -171,3 +171,61 @@ func TestDeleteMetadata(t *testing.T) {
 		t.Fatalf("second delete expected ErrMetadataNotFound, got %v", err)
 	}
 }
+
+func TestUpdateMetadata(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "meta.db")
+
+	db, err := InitMetaDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitMetaDB error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	created := time.Unix(1_700_000_000, 0).UTC()
+	initial := model.Metadata{
+		Key:         "go/foo",
+		Type:        "text",
+		Created:     created,
+		Modified:    created,
+		Description: "original",
+		Tags:        "first,second",
+	}
+
+	if err := InsertMetadata(ctx, db, initial); err != nil {
+		t.Fatalf("InsertMetadata error = %v", err)
+	}
+
+	updated := initial
+	updated.Type = "url"
+	updated.Modified = created.Add(time.Hour).UTC()
+	updated.Description = "updated description"
+	updated.Tags = "updated"
+
+	if err := UpdateMetadata(ctx, db, updated); err != nil {
+		t.Fatalf("UpdateMetadata error = %v", err)
+	}
+
+	got, err := GetMetadata(ctx, db, updated.Key)
+	if err != nil {
+		t.Fatalf("GetMetadata error = %v", err)
+	}
+
+	if got.Type != updated.Type {
+		t.Fatalf("Type = %q, want %q", got.Type, updated.Type)
+	}
+	if !got.Modified.Equal(updated.Modified) {
+		t.Fatalf("Modified = %v, want %v", got.Modified, updated.Modified)
+	}
+	if got.Description != updated.Description {
+		t.Fatalf("Description = %q, want %q", got.Description, updated.Description)
+	}
+	if got.Tags != updated.Tags {
+		t.Fatalf("Tags = %q, want %q", got.Tags, updated.Tags)
+	}
+	if !got.Created.Equal(created) {
+		t.Fatalf("Created changed = %v, want %v", got.Created, created)
+	}
+}
