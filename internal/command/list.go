@@ -24,6 +24,14 @@ type ListCommand struct {
 	Output io.Writer
 }
 
+// NewListCommand constructs a ListCommand using defaults from cfg.
+func NewListCommand(cfg Config) *ListCommand {
+	return &ListCommand{
+		DB:     cfg.DB,
+		Output: cfg.writer(),
+	}
+}
+
 // Name returns the command keyword for invocation.
 func (c *ListCommand) Name() string {
 	return "list"

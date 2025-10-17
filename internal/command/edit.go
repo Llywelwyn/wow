@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/llywelwyn/wow/internal/core"
 	"github.com/llywelwyn/wow/internal/model"
 )
 
@@ -15,6 +16,18 @@ type EditHandler interface {
 // EditCommand opens an existing snippet in the user's editor.
 type EditCommand struct {
 	Editor EditHandler
+}
+
+// NewEditCommand constructs an EditCommand using defaults from cfg.
+func NewEditCommand(cfg Config) *EditCommand {
+	return &EditCommand{
+		Editor: &core.Editor{
+			BaseDir: cfg.BaseDir,
+			DB:      cfg.DB,
+			Now:     cfg.clock(),
+			Open:    cfg.editorOpen(),
+		},
+	}
 }
 
 // Name returns the command keyword.

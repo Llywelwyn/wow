@@ -18,6 +18,19 @@ type SaveCommand struct {
 	Output io.Writer
 }
 
+// NewSaveCommand constructs a SaveCommand using default dependencies from cfg.
+func NewSaveCommand(cfg Config) *SaveCommand {
+	return &SaveCommand{
+		Saver: &core.Saver{
+			BaseDir: cfg.BaseDir,
+			DB:      cfg.DB,
+			Now:     cfg.clock(),
+		},
+		Input:  cfg.reader(),
+		Output: cfg.writer(),
+	}
+}
+
 // Name returns the command keyword for explicit invocation.
 func (c *SaveCommand) Name() string {
 	return "save"

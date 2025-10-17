@@ -15,6 +15,14 @@ type GetCommand struct {
 	Output  io.Writer
 }
 
+// NewGetCommand constructs a GetCommand using defaults from cfg.
+func NewGetCommand(cfg Config) *GetCommand {
+	return &GetCommand{
+		BaseDir: cfg.BaseDir,
+		Output:  cfg.writer(),
+	}
+}
+
 // Name returns the keyword for explicit invocation.
 func (c *GetCommand) Name() string {
 	return "get"
