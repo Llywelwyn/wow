@@ -8,7 +8,6 @@ import (
 
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
-	"github.com/llywelwyn/wow/internal/core"
 	"github.com/llywelwyn/wow/internal/editor"
 	"github.com/llywelwyn/wow/internal/storage"
 )
@@ -34,41 +33,20 @@ func run() error {
 
 	dispatcher := command.NewDispatcher()
 
-	saver := &core.Saver{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
-		Now:     time.Now,
-	}
-	editorSvc := &core.Editor{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
-		Now:     time.Now,
-		Open:    editor.Opener(editor.Command()),
-	}
-	remover := &core.Remover{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
+	cmdCfg := command.Config{
+		BaseDir:    cfg.BaseDir,
+		DB:         db,
+		Input:      os.Stdin,
+		Output:     os.Stdout,
+		Clock:      time.Now,
+		EditorOpen: editor.Opener(editor.Command()),
 	}
 
-	saveCmd := &command.SaveCommand{
-		Saver:  saver,
-		Input:  os.Stdin,
-		Output: os.Stdout,
-	}
-	getCmd := &command.GetCommand{
-		BaseDir: cfg.BaseDir,
-		Output:  os.Stdout,
-	}
-	listCmd := &command.ListCommand{
-		DB:     db,
-		Output: os.Stdout,
-	}
-	editCmd := &command.EditCommand{
-		Editor: editorSvc,
-	}
-	removeCmd := &command.RemoveCommand{
-		Remover: remover,
-	}
+	saveCmd := command.NewSaveCommand(cmdCfg)
+	getCmd := command.NewGetCommand(cmdCfg)
+	editCmd := command.NewEditCommand(cmdCfg)
+	listCmd := command.NewListCommand(cmdCfg)
+	removeCmd := command.NewRemoveCommand(cmdCfg)
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
