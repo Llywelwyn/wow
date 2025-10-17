@@ -48,9 +48,14 @@ func run() error {
 		BaseDir: cfg.BaseDir,
 		Output:  os.Stdout,
 	}
+	listCmd := &command.ListCommand{
+		DB:     db,
+		Output: os.Stdout,
+	}
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
+	dispatcher.Register(listCmd)
 
 	args := os.Args[1:]
 	piped, err := stdinHasData()
@@ -97,5 +102,6 @@ func printUsage() {
 Commands:
   wow save [key]       Explicit save
   wow get <key>        Explicit get
+  wow ls               List saved snippets
 `)
 }
