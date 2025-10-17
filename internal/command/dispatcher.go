@@ -15,7 +15,7 @@ func NewDispatcher() *Dispatcher {
 }
 
 // Register makes the command available to the Dispatcher.
-func (d *Dispatcher) Register(cmd Command) {
+func (d *Dispatcher) Register(cmd Command, aliases ...string) {
 	if cmd == nil {
 		panic("cannot register nil command")
 	}
@@ -23,8 +23,22 @@ func (d *Dispatcher) Register(cmd Command) {
 	if name == "" {
 		panic("command name must not be empty")
 	}
+
+	d.addRoute(name, cmd)
+	for _, alias := range aliases {
+		if alias == "" {
+			panic("alias name must not be empty")
+		}
+		if alias == name {
+			panic(fmt.Sprintf("alias %q duplicates command name", alias))
+		}
+		d.addRoute(alias, cmd)
+	}
+}
+
+func (d *Dispatcher) addRoute(name string, cmd Command) {
 	if _, exists := d.registry[name]; exists {
-		panic("cannot register the same command twice")
+		panic(fmt.Sprintf("command or alias %q already registered", name))
 	}
 	d.registry[name] = cmd
 }

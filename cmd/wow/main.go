@@ -38,6 +38,10 @@ func run() error {
 		DB:      db,
 		Now:     time.Now,
 	}
+	remover := &core.Remover{
+		BaseDir: cfg.BaseDir,
+		DB:      db,
+	}
 
 	saveCmd := &command.SaveCommand{
 		Saver:  saver,
@@ -48,9 +52,18 @@ func run() error {
 		BaseDir: cfg.BaseDir,
 		Output:  os.Stdout,
 	}
+	listCmd := &command.ListCommand{
+		DB:     db,
+		Output: os.Stdout,
+	}
+	removeCmd := &command.RemoveCommand{
+		Remover: remover,
+	}
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
+	dispatcher.Register(listCmd, "ls")
+	dispatcher.Register(removeCmd, "rm")
 
 	args := os.Args[1:]
 	piped, err := stdinHasData()
@@ -90,12 +103,12 @@ func stdinHasData() (bool, error) {
 
 func printUsage() {
 	fmt.Fprintf(os.Stdout, `Usage:
-  wow [key]            Retrieve snippet when no stdin data
-  wow [key] < file     Save snippet with explicit key
-  wow < file           Save snippet with auto-generated key
-
-Commands:
-  wow save [key]       Explicit save
-  wow get <key>        Explicit get
+  wow [key]                        Retrieve snippet when no stdin data
+  wow [key] < file                 Save snippet with explicit key
+  wow < file                       Save snippet with auto-generated key
+  wow save [key]                   Explicit save
+  wow get <key>                    Explicit get
+  wow list [--verbose] [--plain]   List saved snippets (alias: ls)
+  wow remove <key>                 Remove snippet (alias: rm)
 `)
 }

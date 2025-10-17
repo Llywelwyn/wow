@@ -22,7 +22,7 @@ var (
 // ResolvePath converts a normalized key into an absolute path under the provided base directory.
 // It ensures the resolved path does not escape the base directory.
 func ResolvePath(baseDir, key string) (string, error) {
-	normalized, err := normalizeKey(key)
+	normalized, err := Normalize(key)
 	if err != nil {
 		return "", err
 	}
@@ -41,10 +41,10 @@ func ResolvePath(baseDir, key string) (string, error) {
 	return clean, nil
 }
 
-// normalizeKey trims and validates the provided key.
+// Normalize trims and validates the provided key.
 // It returns the normalized representation
 // or an error if the key is invalid.
-func normalizeKey(raw string) (string, error) {
+func Normalize(raw string) (string, error) {
 	key := strings.TrimSpace(raw)
 	if key == "" {
 		return "", ErrEmpty

@@ -134,3 +134,40 @@ func TestListMetadataOrdersByCreatedDesc(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteMetadata(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "meta.db")
+
+	db, err := InitMetaDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitMetaDB error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	now := time.Unix(1_700_000_000, 0)
+	meta := model.Metadata{
+		Key:      "delete/me",
+		Type:     "text",
+		Created:  now,
+		Modified: now,
+	}
+
+	if err := InsertMetadata(ctx, db, meta); err != nil {
+		t.Fatalf("InsertMetadata error = %v", err)
+	}
+
+	if err := DeleteMetadata(ctx, db, meta.Key); err != nil {
+		t.Fatalf("DeleteMetadata error = %v", err)
+	}
+
+	if _, err := GetMetadata(ctx, db, meta.Key); err != ErrMetadataNotFound {
+		t.Fatalf("expected ErrMetadataNotFound after delete, got %v", err)
+	}
+
+	if err := DeleteMetadata(ctx, db, meta.Key); err != ErrMetadataNotFound {
+		t.Fatalf("second delete expected ErrMetadataNotFound, got %v", err)
+	}
+}
