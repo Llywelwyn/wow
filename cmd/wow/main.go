@@ -38,6 +38,10 @@ func run() error {
 		DB:      db,
 		Now:     time.Now,
 	}
+	remover := &core.Remover{
+		BaseDir: cfg.BaseDir,
+		DB:      db,
+	}
 
 	saveCmd := &command.SaveCommand{
 		Saver:  saver,
@@ -52,10 +56,14 @@ func run() error {
 		DB:     db,
 		Output: os.Stdout,
 	}
+	removeCmd := &command.RemoveCommand{
+		Remover: remover,
+	}
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
 	dispatcher.Register(listCmd, "ls")
+	dispatcher.Register(removeCmd, "rm")
 
 	args := os.Args[1:]
 	piped, err := stdinHasData()
@@ -102,6 +110,7 @@ func printUsage() {
 Commands:
   wow save [key]       Explicit save
   wow get <key>        Explicit get
-  wow ls               List saved snippets
+  wow list             List saved snippets (alias: ls)
+  wow rm <key>         Remove snippet
 `)
 }
