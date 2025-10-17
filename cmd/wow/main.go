@@ -9,6 +9,7 @@ import (
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/editor"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -38,6 +39,12 @@ func run() error {
 		DB:      db,
 		Now:     time.Now,
 	}
+	editorSvc := &core.Editor{
+		BaseDir: cfg.BaseDir,
+		DB:      db,
+		Now:     time.Now,
+		Open:    editor.Opener(editor.Command()),
+	}
 	remover := &core.Remover{
 		BaseDir: cfg.BaseDir,
 		DB:      db,
@@ -56,12 +63,16 @@ func run() error {
 		DB:     db,
 		Output: os.Stdout,
 	}
+	editCmd := &command.EditCommand{
+		Editor: editorSvc,
+	}
 	removeCmd := &command.RemoveCommand{
 		Remover: remover,
 	}
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
+	dispatcher.Register(editCmd)
 	dispatcher.Register(listCmd, "ls")
 	dispatcher.Register(removeCmd, "rm")
 
@@ -108,6 +119,7 @@ func printUsage() {
   wow < file                       Save snippet with auto-generated key
   wow save [key]                   Explicit save
   wow get <key>                    Explicit get
+  wow edit <key>                   Edit snippet in $WOW_EDITOR or $EDITOR
   wow list [--verbose] [--plain]   List saved snippets (alias: ls)
   wow remove <key>                 Remove snippet (alias: rm)
 `)
