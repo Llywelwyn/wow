@@ -20,57 +20,86 @@ type Editor struct {
 	Open    func(context.Context, string) error
 }
 
-// Edit opens the snippet for modification and refreshes metadata when changed.
-func (e *Editor) Edit(ctx context.Context, rawKey string) (model.Metadata, error) {
+// Edit opens the snippet for modification
+// and refreshes metadata when changed.
+func (e *Editor) Edit(ctx context.Context, rawKey string) (meta model.Metadata, err error) {
+	// Validate dependencies
 	if e.DB == nil || e.Now == nil || e.Open == nil {
 		return model.Metadata{}, errors.New("editor misconfigured")
 	}
 
-	normalized, err := key.Normalize(rawKey)
+	// Get current metadata
+	meta, err = e.getMetadata(ctx, rawKey)
 	if err != nil {
 		return model.Metadata{}, err
 	}
 
-	meta, err := storage.GetMetadata(ctx, e.DB, normalized)
+	// Resolve file path
+	path, err := key.ResolvePath(e.BaseDir, rawKey)
 	if err != nil {
 		return model.Metadata{}, err
 	}
 
-	path, err := key.ResolvePath(e.BaseDir, normalized)
-	if err != nil {
-		return model.Metadata{}, err
-	}
-
+	// Stat before editing
 	before, err := os.Stat(path)
 	if err != nil {
 		return model.Metadata{}, err
 	}
 
-	if err := e.Open(ctx, path); err != nil {
+	// Open file for editing
+	if err = e.Open(ctx, path); err != nil {
 		return model.Metadata{}, err
 	}
 
+	// Stat after editing
 	after, err := os.Stat(path)
 	if err != nil {
 		return model.Metadata{}, err
 	}
 
-	changed := after.ModTime() != before.ModTime() || after.Size() != before.Size()
-	if !changed {
+	// If file unchanged, return original metadata
+	if !e.fileChanged(before, after) {
 		return meta, nil
 	}
 
+	// Read updated file data
 	data, err := storage.Read(path)
 	if err != nil {
 		return model.Metadata{}, err
 	}
 
-	meta.Type = detectType(data)
-	meta.Modified = e.Now().UTC()
+	// Update and return new metadata
+	return e.updateMetadata(data, ctx, meta)
+}
 
-	if err := storage.UpdateMetadata(ctx, e.DB, meta); err != nil {
+// getMetadata normalizes the raw key given
+// and fetches associated metadata from storage.
+func (e *Editor) getMetadata(ctx context.Context, rawKey string) (model.Metadata, error) {
+	normalizedKey, err := key.Normalize(rawKey)
+	if err != nil {
+		return model.Metadata{}, err
+	}
+	metadata, err := storage.GetMetadata(ctx, e.DB, normalizedKey)
+	if err != nil {
+		return model.Metadata{}, err
+	}
+	return metadata, nil
+}
+
+// fileChanged returns true if the file's mod time or size has changed.
+func (e *Editor) fileChanged(before, after os.FileInfo) bool {
+	return after.ModTime() != before.ModTime() || after.Size() != before.Size()
+}
+
+// updateMetadata updates Type and Modified fields.
+// Type is detected from data content.
+// Modified is set to the current time.
+func (e *Editor) updateMetadata(data []byte, ctx context.Context, metadata model.Metadata) (model.Metadata, error) {
+	metadata.Type = detectType(data)
+	metadata.Modified = e.Now().UTC()
+	if err := storage.UpdateMetadata(ctx, e.DB, metadata); err != nil {
 		return model.Metadata{}, err
 	}
 
-	return meta, nil
+	return metadata, nil
 }
