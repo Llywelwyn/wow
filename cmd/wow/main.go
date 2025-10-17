@@ -9,6 +9,7 @@ import (
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/editor"
+	"github.com/llywelwyn/wow/internal/runner"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -34,12 +35,12 @@ func run() error {
 	dispatcher := command.NewDispatcher()
 
 	cmdCfg := command.Config{
-		BaseDir:    cfg.BaseDir,
-		DB:         db,
-		Input:      os.Stdin,
-		Output:     os.Stdout,
-		Clock:      time.Now,
-		EditorOpen: editor.OpenPath(editor.GetEditorFromEnv()),
+		BaseDir: cfg.BaseDir,
+		DB:      db,
+		Input:   os.Stdin,
+		Output:  os.Stdout,
+		Clock:   time.Now,
+		Editor:  runner.Run(editor.GetEditorFromEnv()),
 	}
 
 	saveCmd := command.NewSaveCommand(cmdCfg)

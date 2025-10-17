@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -21,7 +21,7 @@ func TestGetCommandReadsSnippet(t *testing.T) {
 	}
 	defer db.Close()
 
-	saver := &core.Saver{
+	saver := &services.Saver{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -22,7 +22,7 @@ func newTestSaveCommand(t *testing.T) (*SaveCommand, func()) {
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &core.Saver{
+	saver := &services.Saver{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {

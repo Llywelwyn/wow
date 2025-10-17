@@ -8,12 +8,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 )
 
 // SaveCommand persists snippet content read from stdin and prints the resolved key.
 type SaveCommand struct {
-	Saver  *core.Saver
+	Saver  *services.Saver
 	Input  io.Reader
 	Output io.Writer
 }
@@ -21,7 +21,7 @@ type SaveCommand struct {
 // NewSaveCommand constructs a SaveCommand using default dependencies from cfg.
 func NewSaveCommand(cfg Config) *SaveCommand {
 	return &SaveCommand{
-		Saver: &core.Saver{
+		Saver: &services.Saver{
 			BaseDir: cfg.BaseDir,
 			DB:      cfg.DB,
 			Now:     cfg.clock(),
@@ -57,7 +57,7 @@ func (c *SaveCommand) Execute(args []string) error {
 		return err
 	}
 
-	res, err := c.Saver.Save(context.Background(), core.SaveRequest{
+	res, err := c.Saver.Save(context.Background(), services.SaveRequest{
 		Key:         keyArg,
 		Description: *desc,
 		Tags:        splitTags(*tags),

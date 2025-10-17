@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
-func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *core.Saver, func()) {
+func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *services.Saver, func()) {
 	t.Helper()
 
 	base := t.TempDir()
@@ -22,7 +22,7 @@ func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *core.Saver, func()) {
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &core.Saver{
+	saver := &services.Saver{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {
@@ -30,7 +30,7 @@ func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *core.Saver, func()) {
 		},
 	}
 
-	remover := &core.Remover{
+	remover := &services.Remover{
 		BaseDir: base,
 		DB:      db,
 	}
@@ -49,7 +49,7 @@ func TestRemoveCommandDeletesSnippet(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if _, err := saver.Save(ctx, core.SaveRequest{Key: "go/foo", Reader: strings.NewReader("content")}); err != nil {
+	if _, err := saver.Save(ctx, services.SaveRequest{Key: "go/foo", Reader: strings.NewReader("content")}); err != nil {
 		t.Fatalf("Save error = %v", err)
 	}
 

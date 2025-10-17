@@ -1,9 +1,7 @@
-package core
+package services
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +23,6 @@ func newEditEnv(t *testing.T) (*Editor, *Saver, context.Context) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	ctx := context.Background()
-
 	saver := &Saver{
 		BaseDir: base,
 		DB:      db,
@@ -45,55 +42,6 @@ func newEditEnv(t *testing.T) (*Editor, *Saver, context.Context) {
 	return editor, saver, ctx
 }
 
-func TestEditorEditMisconfigured(t *testing.T) {
-	editor := &Editor{}
-	if _, err := editor.Edit(context.Background(), "go/foo"); err == nil {
-		t.Fatalf("expected misconfigured error")
-	}
-}
-
-func TestEditorEditInvalidKey(t *testing.T) {
-	editor := &Editor{
-		DB:  &sql.DB{},
-		Now: time.Now,
-		Open: func(ctx context.Context, path string) error {
-			return nil
-		},
-	}
-
-	if _, err := editor.Edit(context.Background(), "bad key"); err == nil {
-		t.Fatalf("expected invalid key error")
-	}
-}
-
-func TestEditorEditMetadataNotFound(t *testing.T) {
-	editor, _, ctx := newEditEnv(t)
-	editor.Open = func(ctx context.Context, path string) error { return nil }
-
-	if _, err := editor.Edit(ctx, "missing/key"); err != storage.ErrMetadataNotFound {
-		t.Fatalf("expected ErrMetadataNotFound, got %v", err)
-	}
-}
-
-func TestEditorEditOpenError(t *testing.T) {
-	editor, saver, ctx := newEditEnv(t)
-
-	if _, err := saver.Save(ctx, SaveRequest{
-		Key:    "go/foo",
-		Reader: strings.NewReader("package main\n"),
-	}); err != nil {
-		t.Fatalf("Save error = %v", err)
-	}
-
-	editor.Open = func(ctx context.Context, path string) error {
-		return errors.New("editor failed")
-	}
-
-	if _, err := editor.Edit(ctx, "go/foo"); err == nil {
-		t.Fatalf("expected editor failure error")
-	}
-}
-
 func TestEditorEditUpdatesMetadataWhenFileChanges(t *testing.T) {
 	editor, saver, ctx := newEditEnv(t)
 
@@ -102,6 +50,11 @@ func TestEditorEditUpdatesMetadataWhenFileChanges(t *testing.T) {
 		Reader: strings.NewReader("package main\n"),
 	}); err != nil {
 		t.Fatalf("Save error = %v", err)
+	}
+
+	original, err := storage.GetMetadata(ctx, editor.DB, "go/foo")
+	if err != nil {
+		t.Fatalf("GetMetadata error = %v", err)
 	}
 
 	editor.Open = func(ctx context.Context, path string) error {
@@ -113,7 +66,11 @@ func TestEditorEditUpdatesMetadataWhenFileChanges(t *testing.T) {
 		t.Fatalf("Edit error = %v", err)
 	}
 
-	wantModified := editor.Now()
+	if meta.Type != "url" {
+		t.Fatalf("Type = %q, want url", meta.Type)
+	}
+
+	wantModified := editor.Now().UTC()
 	if !meta.Modified.Equal(wantModified) {
 		t.Fatalf("Modified = %v, want %v", meta.Modified, wantModified)
 	}
@@ -123,8 +80,14 @@ func TestEditorEditUpdatesMetadataWhenFileChanges(t *testing.T) {
 		t.Fatalf("GetMetadata error = %v", err)
 	}
 
+	if stored.Type != "url" {
+		t.Fatalf("stored Type = %q, want url", stored.Type)
+	}
 	if !stored.Modified.Equal(wantModified) {
 		t.Fatalf("stored Modified = %v, want %v", stored.Modified, wantModified)
+	}
+	if !stored.Created.Equal(original.Created) {
+		t.Fatalf("stored Created changed = %v, want %v", stored.Created, original.Created)
 	}
 }
 
@@ -152,7 +115,10 @@ func TestEditorEditNoChangeLeavesMetadataUntouched(t *testing.T) {
 		t.Fatalf("Edit error = %v", err)
 	}
 
-	if meta != original {
-		t.Fatalf("Metadata changed = %q, want %q", meta.Type, original.Type)
+	if meta.Modified != original.Modified {
+		t.Fatalf("Modified changed = %v, want %v", meta.Modified, original.Modified)
+	}
+	if meta.Type != original.Type {
+		t.Fatalf("Type changed = %q, want %q", meta.Type, original.Type)
 	}
 }

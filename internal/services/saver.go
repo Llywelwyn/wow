@@ -1,4 +1,4 @@
-package core
+package services
 
 import (
 	"bytes"
@@ -125,30 +125,6 @@ func (s *Saver) resolveKey(rawKey string, now time.Time) (string, error) {
 		return "", err
 	}
 	return autoKey, nil
-}
-
-func detectType(payload []byte) string {
-	firstLine := firstLine(payload)
-	if isURL(firstLine) {
-		return "url"
-	}
-	return "text"
-}
-
-func firstLine(payload []byte) string {
-	idx := bytes.IndexByte(payload, '\n')
-	if idx == -1 {
-		return strings.TrimSpace(string(payload))
-	}
-	return strings.TrimSpace(string(payload[:idx]))
-}
-
-func isURL(line string) bool {
-	lower := strings.ToLower(line)
-	return strings.HasPrefix(lower, "http://") ||
-		strings.HasPrefix(lower, "https://") ||
-		strings.HasPrefix(lower, "ftp://") ||
-		strings.HasPrefix(lower, "file://")
 }
 
 func normalizeTags(tags []string) string {
