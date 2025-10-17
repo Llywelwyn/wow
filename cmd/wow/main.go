@@ -103,14 +103,12 @@ func stdinHasData() (bool, error) {
 
 func printUsage() {
 	fmt.Fprintf(os.Stdout, `Usage:
-  wow [key]            Retrieve snippet when no stdin data
-  wow [key] < file     Save snippet with explicit key
-  wow < file           Save snippet with auto-generated key
-
-Commands:
-  wow save [key]       Explicit save
-  wow get <key>        Explicit get
-  wow list             List saved snippets (alias: ls)
-  wow rm <key>         Remove snippet
+  wow [key]                        Retrieve snippet when no stdin data
+  wow [key] < file                 Save snippet with explicit key
+  wow < file                       Save snippet with auto-generated key
+  wow save [key]                   Explicit save
+  wow get <key>                    Explicit get
+  wow list [--verbose] [--plain]   List saved snippets (alias: ls)
+  wow remove <key>                 Remove snippet (alias: rm)
 `)
 }
