@@ -9,6 +9,8 @@ import (
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/editor"
+	"github.com/llywelwyn/wow/internal/opener"
+	"github.com/llywelwyn/wow/internal/pager"
 	"github.com/llywelwyn/wow/internal/runner"
 	"github.com/llywelwyn/wow/internal/storage"
 )
@@ -41,17 +43,21 @@ func run() error {
 		Output:  os.Stdout,
 		Clock:   time.Now,
 		Editor:  runner.Run(editor.GetEditorFromEnv()),
+		Opener:  runner.Run(opener.GetOpenerFromEnv()),
+		Pager:   runner.Run(pager.GetPagerFromEnv()),
 	}
 
 	saveCmd := command.NewSaveCommand(cmdCfg)
 	getCmd := command.NewGetCommand(cmdCfg)
 	editCmd := command.NewEditCommand(cmdCfg)
+	openCmd := command.NewOpenCommand(cmdCfg)
 	listCmd := command.NewListCommand(cmdCfg)
 	removeCmd := command.NewRemoveCommand(cmdCfg)
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
 	dispatcher.Register(editCmd)
+	dispatcher.Register(openCmd)
 	dispatcher.Register(listCmd, "ls")
 	dispatcher.Register(removeCmd, "rm")
 
@@ -110,6 +116,7 @@ func printUsage() {
   wow < file                       Save snippet with auto-generated key
   wow save [key]                   Explicit save
   wow get <key>                    Explicit get
+  wow open <key> [--pager]         Open snippet or view in pager
   wow edit <key>                   Edit snippet in $WOW_EDITOR or $EDITOR
   wow list [--verbose] [--plain]   List saved snippets (alias: ls)
   wow remove <key>                 Remove snippet (alias: rm)
