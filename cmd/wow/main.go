@@ -55,7 +55,7 @@ func run() error {
 
 	dispatcher.Register(saveCmd)
 	dispatcher.Register(getCmd)
-	dispatcher.Register(listCmd)
+	dispatcher.Register(listCmd, "ls")
 
 	args := os.Args[1:]
 	piped, err := stdinHasData()

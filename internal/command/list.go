@@ -26,7 +26,7 @@ type ListCommand struct {
 
 // Name returns the command keyword for invocation.
 func (c *ListCommand) Name() string {
-	return "ls"
+	return "list"
 }
 
 // Execute lists metadata rows according to the provided flags.
