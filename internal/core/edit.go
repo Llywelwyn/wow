@@ -24,7 +24,7 @@ type Editor struct {
 // and refreshes metadata when changed.
 func (e *Editor) Edit(ctx context.Context, rawKey string) (meta model.Metadata, err error) {
 	// Validate dependencies
-	if e.DB == nil || e.Now == nil || e.Open == nil {
+	if e.DB == nil || e.Now == nil || e.Open == nil || strings.TrimSpace(e.BaseDir) == "" {
 		return model.Metadata{}, errors.New("editor misconfigured")
 	}
 
