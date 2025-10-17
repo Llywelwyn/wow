@@ -94,6 +94,26 @@ ORDER BY created DESC
 	return result, nil
 }
 
+// DeleteMetadata removes the metadata row for the provided key.
+func DeleteMetadata(ctx context.Context, db *sql.DB, key string) error {
+	const query = `
+DELETE FROM snippets
+WHERE key = ?
+`
+	res, err := db.ExecContext(ctx, query, key)
+	if err != nil {
+		return fmt.Errorf("delete metadata: %w", err)
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete metadata: rows affected: %w", err)
+	}
+	if count == 0 {
+		return ErrMetadataNotFound
+	}
+	return nil
+}
+
 func sqliteIsUniqueError(err error) bool {
 	var se sqlite3.Error
 	if !errors.As(err, &se) {
