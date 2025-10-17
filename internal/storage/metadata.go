@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
@@ -116,6 +117,12 @@ WHERE key = ?
 
 // UpdateMetadata updates mutable metadata fields for the provided snippet key.
 func UpdateMetadata(ctx context.Context, db *sql.DB, meta model.Metadata) error {
+	if strings.TrimSpace(meta.Key) == "" {
+		return fmt.Errorf("update metadata: empty key")
+	}
+	if meta.Modified.IsZero() {
+		return fmt.Errorf("update metadata: modified time is zero")
+	}
 	const query = `
 UPDATE snippets
 SET type = ?, modified = ?, description = ?, tags = ?
