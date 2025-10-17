@@ -8,7 +8,7 @@ import (
 )
 
 // Command resolves the editor executable using WOW_EDITOR, EDITOR, or a nano fallback.
-func Command() string {
+func GetEditorFromEnv() string {
 	if cmd := strings.TrimSpace(os.Getenv("WOW_EDITOR")); cmd != "" {
 		return cmd
 	}
@@ -18,10 +18,15 @@ func Command() string {
 	return "nano"
 }
 
-// Opener returns a function that launches the provided editor command.
-func Opener(editor string) func(context.Context, string) error {
+// OpenPath returns a function that launches the provided editor command.
+func OpenPath(editor string) func(context.Context, string) error {
 	return func(ctx context.Context, path string) error {
-		cmd := exec.CommandContext(ctx, editor, path)
+		parts := strings.Fields(strings.TrimSpace(editor))
+		if len(parts) == 0 {
+			panic("editor path is empty")
+		}
+		name, args := parts[0], parts[1:]
+		cmd := exec.CommandContext(ctx, name, append(args, path)...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
