@@ -1,0 +1,8 @@
+$ setenv WOW_HOME ${ROOTDIR}/home
+$ setenv WOW_OPENER printf
+$ setenv WOW_PAGER cat
+$ fecho input.txt hello world
+$ wow save notes/demo < input.txt
+notes/demo
+$ wow open --pager notes/demo
+hello world
