@@ -119,7 +119,7 @@ func printUsage() {
   wow [key] [--tag string] [--untag string] [@tag] [-@tag]    	Retrieve snippet when no stdin data
   wow <key> [--tag string] [@tag] [--desc string] < file      	Save snippet with explicit key
   wow [--tag string] [@tag] [--desc string] < file            	Save snippet with auto-generated key
-  wow save <key> [--tag string] [@tag] [---desc string] < file	Explicit save
+  wow save <key> [--tag string] [@tag] [--desc string] < file	Explicit save
   wow get <key> [--tag string] [--untag string] [@tag] [-@tag]	Explicit get
   wow open <key> [--pager]                                    	Open snippet or view in pager
   wow edit <key>                                              	Edit snippet in $WOW_EDITOR or $EDITOR
