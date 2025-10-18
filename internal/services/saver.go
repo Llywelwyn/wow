@@ -89,7 +89,7 @@ func (s *Saver) Save(ctx context.Context, req SaveRequest) (SaveResult, error) {
 		Created:     now,
 		Modified:    now,
 		Description: req.Description,
-		Tags:        normalizeTags(req.Tags),
+		Tags:        MergeTags("", req.Tags, nil),
 	}
 
 	if err := storage.InsertMetadata(ctx, s.DB, meta); err != nil {
@@ -125,25 +125,4 @@ func (s *Saver) resolveKey(rawKey string, now time.Time) (string, error) {
 		return "", err
 	}
 	return autoKey, nil
-}
-
-func normalizeTags(tags []string) string {
-	if len(tags) == 0 {
-		return ""
-	}
-
-	var normalized []string
-	seen := make(map[string]struct{})
-	for _, t := range tags {
-		t = strings.TrimSpace(strings.ToLower(t))
-		if t == "" {
-			continue
-		}
-		if _, ok := seen[t]; ok {
-			continue
-		}
-		seen[t] = struct{}{}
-		normalized = append(normalized, t)
-	}
-	return strings.Join(normalized, ",")
 }
