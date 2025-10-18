@@ -75,7 +75,11 @@ func (c *ListCommand) Execute(args []string) error {
 	}
 
 	if *plain != "" || !writerIsTerminal(c.Output) {
-		return renderPlain(c.Output, entries, *quiet, *plain)
+		delimiter := *plain
+		if delimiter == "" {
+			delimiter = "\t"
+		}
+		return renderPlain(c.Output, entries, *quiet, delimiter)
 	}
 	return renderPretty(c.Output, entries, *quiet)
 }
