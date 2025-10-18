@@ -1,0 +1,6 @@
+$ setenv WOW_HOME ${ROOTDIR}/home
+$ fecho input.txt hello world
+$ wow notes/demo < input.txt
+notes/demo
+$ wow notes/demo
+hello world

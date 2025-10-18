@@ -1,0 +1,8 @@
+$ setenv WOW_HOME ${ROOTDIR}/home
+$ fecho input.txt hello world
+$ wow save notes/demo < input.txt
+notes/demo
+$ wow notes/demo --tag test,case
+added @test @case
+$ wow notes/demo --untag test,case
+removed @test @case
