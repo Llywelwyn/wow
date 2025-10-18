@@ -81,6 +81,11 @@ func run() error {
 		return nil
 	}
 
+	if args[0] == "--help" || args[0] == "-h" {
+		printUsage()
+		return nil
+	}
+
 	// Check for explicit command in args[0]
 	// and execute if a match is found.
 	if cmd, ok := dispatcher.Lookup(args[0]); ok {
@@ -111,14 +116,25 @@ func stdinHasData() (bool, error) {
 
 func printUsage() {
 	fmt.Fprintf(os.Stdout, `Usage:
-  wow [key]                        Retrieve snippet when no stdin data
-  wow [key] < file                 Save snippet with explicit key
-  wow < file                       Save snippet with auto-generated key
-  wow save [key]                   Explicit save
-  wow get <key>                    Explicit get
-  wow open <key> [--pager]         Open snippet or view in pager
-  wow edit <key>                   Edit snippet in $WOW_EDITOR or $EDITOR
-  wow list [--verbose] [--plain]   List saved snippets (alias: ls)
-  wow remove <key>                 Remove snippet (alias: rm)
+  wow [key] [--tag string] [--untag string] [@tag] [-@tag]    	Retrieve snippet when no stdin data
+  wow <key> [--tag string] [@tag] [--desc string] < file      	Save snippet with explicit key
+  wow [--tag string] [@tag] [--desc string] < file            	Save snippet with auto-generated key
+  wow save <key> [--tag string] [@tag] [---desc string] < file	Explicit save
+  wow get <key> [--tag string] [--untag string] [@tag] [-@tag]	Explicit get
+  wow open <key> [--pager]                                    	Open snippet or view in pager
+  wow edit <key>                                              	Edit snippet in $WOW_EDITOR or $EDITOR
+  wow list [--plain] [--quiet]                                	List saved snippets (alias: ls)
+  wow remove <key>                                            	Remove snippet (alias: rm)
+
+  Run any command with --help for more info on that specific command.
+
+  Any flags can be written in shorthand (with a single dash, and their first letter).
+  For example:
+   wow list --plain --quiet 	-->	wow ls -pq
+   wow <key> --tag tag1,tag2	-->	wow <key> -t=tag1,tag2
+
+
+  When combining short flags, only the final flag can accept an argument. If you need
+  to pass arguments to multiple flags, they must be written separately.
 `)
 }
