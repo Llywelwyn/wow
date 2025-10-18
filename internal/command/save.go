@@ -8,12 +8,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 )
 
 // SaveCommand persists snippet content read from stdin and prints the resolved key.
 type SaveCommand struct {
-	Saver  *core.Saver
+	Saver  *services.Saver
 	Input  io.Reader
 	Output io.Writer
 }
@@ -21,7 +21,7 @@ type SaveCommand struct {
 // NewSaveCommand constructs a SaveCommand using default dependencies from cfg.
 func NewSaveCommand(cfg Config) *SaveCommand {
 	return &SaveCommand{
-		Saver: &core.Saver{
+		Saver: &services.Saver{
 			BaseDir: cfg.BaseDir,
 			DB:      cfg.DB,
 			Now:     cfg.clock(),
@@ -42,9 +42,13 @@ func (c *SaveCommand) Execute(args []string) error {
 		return errors.New("save command not fully configured")
 	}
 
+	tagArgs := extractTagArgs(args)
+	args = tagArgs.Others
+
 	fs := flag.NewFlagSet("save", flag.ContinueOnError)
 	desc := fs.String("desc", "", "description")
-	tags := fs.String("tags", "", "comma-separated tags")
+	var tagsCSV string
+	fs.StringVar(&tagsCSV, "tag", "", "comma-separated tags")
 	fs.SetOutput(io.Discard)
 
 	var keyArg string
@@ -57,10 +61,12 @@ func (c *SaveCommand) Execute(args []string) error {
 		return err
 	}
 
-	res, err := c.Saver.Save(context.Background(), core.SaveRequest{
+	addTags := append(splitTags(tagsCSV), tagArgs.Add...)
+
+	res, err := c.Saver.Save(context.Background(), services.SaveRequest{
 		Key:         keyArg,
 		Description: *desc,
-		Tags:        splitTags(*tags),
+		Tags:        addTags,
 		Reader:      c.Input,
 	})
 	if err != nil {
@@ -71,15 +77,4 @@ func (c *SaveCommand) Execute(args []string) error {
 		return fmt.Errorf("write key to output: %w", err)
 	}
 	return nil
-}
-
-func splitTags(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-	}
-	return parts
 }

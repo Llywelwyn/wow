@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -22,7 +22,7 @@ func newTestSaveCommand(t *testing.T) (*SaveCommand, func()) {
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &core.Saver{
+	saver := &services.Saver{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {
@@ -85,7 +85,7 @@ func TestSaveCommandTagsFlag(t *testing.T) {
 	cmd.Input = strings.NewReader("content")
 	cmd.Output = &out
 
-	if err := cmd.Execute([]string{"--tags", "foo,Bar"}); err != nil {
+	if err := cmd.Execute([]string{"--tag", "foo,Bar"}); err != nil {
 		t.Fatalf("Execute error = %v", err)
 	}
 
@@ -95,6 +95,27 @@ func TestSaveCommandTagsFlag(t *testing.T) {
 	}
 
 	meta, err := storage.GetMetadata(context.Background(), cmd.Saver.DB, got)
+	if err != nil {
+		t.Fatalf("GetMetadata error = %v", err)
+	}
+	if meta.Tags != "foo,bar" {
+		t.Fatalf("tags stored = %q, want foo,bar", meta.Tags)
+	}
+}
+
+func TestSaveCommandImplicitTags(t *testing.T) {
+	cmd, cleanup := newTestSaveCommand(t)
+	defer cleanup()
+
+	var out bytes.Buffer
+	cmd.Input = strings.NewReader("content")
+	cmd.Output = &out
+
+	if err := cmd.Execute([]string{"go/foo", "@Foo", "@bar"}); err != nil {
+		t.Fatalf("Execute error = %v", err)
+	}
+
+	meta, err := storage.GetMetadata(context.Background(), cmd.Saver.DB, "go/foo")
 	if err != nil {
 		t.Fatalf("GetMetadata error = %v", err)
 	}

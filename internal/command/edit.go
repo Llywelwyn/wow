@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/llywelwyn/wow/internal/core"
 	"github.com/llywelwyn/wow/internal/model"
+	"github.com/llywelwyn/wow/internal/services"
 )
 
 // EditHandler wraps the edit behaviour required by the command.
@@ -21,11 +21,11 @@ type EditCommand struct {
 // NewEditCommand constructs an EditCommand using defaults from cfg.
 func NewEditCommand(cfg Config) *EditCommand {
 	return &EditCommand{
-		Editor: &core.Editor{
+		Editor: &services.Editor{
 			BaseDir: cfg.BaseDir,
 			DB:      cfg.DB,
 			Now:     cfg.clock(),
-			Open:    cfg.editorOpen(),
+			Open:    cfg.editor(),
 		},
 	}
 }

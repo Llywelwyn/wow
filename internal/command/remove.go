@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 
-	"github.com/llywelwyn/wow/internal/core"
+	"github.com/llywelwyn/wow/internal/services"
 )
 
 // RemoveCommand deletes snippets identified by key.
 type RemoveCommand struct {
-	Remover *core.Remover
+	Remover *services.Remover
 }
 
 // NewRemoveCommand constructs a RemoveCommand using defaults from cfg.
 func NewRemoveCommand(cfg Config) *RemoveCommand {
 	return &RemoveCommand{
-		Remover: &core.Remover{
+		Remover: &services.Remover{
 			BaseDir: cfg.BaseDir,
 			DB:      cfg.DB,
 		},
