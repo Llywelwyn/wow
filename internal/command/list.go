@@ -118,7 +118,7 @@ func renderPretty(w io.Writer, entries []model.Metadata, quiet bool) error {
 	if quiet {
 		fmt.Fprintln(tw, "KEY")
 	} else {
-		fmt.Fprintln(tw, "KEY\tCREATED\tMODIFIED\tTAGS\tDESCRIPTION")
+		fmt.Fprintln(tw, "KEY\tTAGS\tMODIFIED\tCREATED\tDESCRIPTION")
 	}
 
 	for _, meta := range entries {
