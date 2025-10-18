@@ -48,25 +48,38 @@ func (c *GetCommand) Execute(args []string) error {
 	}
 
 	tagArgs := extractTagArgs(args)
+
+	fs := flag.NewFlagSet("get", flag.ContinueOnError)
+	fs.SetOutput(c.Output)
+	var addCSV *string = fs.StringP("tag", "t", "", "comma-separated tags to add")
+	var removeCSV *string = fs.StringP("untag", "u", "", "comma-separated tags to remove")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
+	usage := `Usage:
+  wow get <key> [--tag tags] [--untag tags] [@tag ...] [-@tag ...]`
+
 	if len(tagArgs.Others) == 0 {
 		return errors.New("key required")
 	}
 
 	keyArg := tagArgs.Others[0]
 	if strings.HasPrefix(keyArg, "-") {
+		if err := fs.Parse(tagArgs.Others); err != nil {
+			return err
+		}
+		if *help {
+			fmt.Fprintln(c.Output, usage)
+			fs.PrintDefaults()
+			return nil
+		}
 		return errors.New("key must be the first argument")
 	}
-	flagArgs := tagArgs.Others[1:]
 
-	fs := flag.NewFlagSet("get", flag.ContinueOnError)
-	var addCSV *string = fs.StringP("tag", "t", "", "comma-separated tags to add")
-	var removeCSV *string = fs.StringP("untag", "u", "", "comma-separated tags to remove")
-	var help *bool = fs.BoolP("help", "h", false, "display help")
-	if err := fs.Parse(flagArgs); err != nil {
+	if err := fs.Parse(tagArgs.Others[1:]); err != nil {
 		return err
 	}
 
 	if *help {
+		fmt.Fprintln(c.Output, usage)
 		fs.PrintDefaults()
 		return nil
 	}

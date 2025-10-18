@@ -46,6 +46,7 @@ func (c *SaveCommand) Execute(args []string) error {
 	args = tagArgs.Others
 
 	fs := flag.NewFlagSet("save", flag.ContinueOnError)
+	fs.SetOutput(c.Output)
 	var desc *string = fs.StringP("desc", "d", "", "description")
 	var tags *string = fs.StringP("tag", "t", "", "comma-separated tags, e.g. one,two")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
@@ -61,8 +62,9 @@ func (c *SaveCommand) Execute(args []string) error {
 	}
 
 	if *help {
+		fmt.Fprintln(c.Output, `Usage:
+  wow save [key] [--desc description] [--tag tags] [@tag ...] < snippet`)
 		fs.PrintDefaults()
-
 		return nil
 	}
 

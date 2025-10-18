@@ -43,6 +43,7 @@ func (c *ListCommand) Execute(args []string) error {
 	}
 
 	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
+	fs.SetOutput(c.Output)
 	var plain *string = fs.StringP("plain", "p", "", "removes pretty formatting; pass a string to override tab-delimiter")
 	fs.Lookup("plain").NoOptDefVal = "\t"
 	var quiet *bool = fs.BoolP("quiet", "q", false, "quiet output: only keys")
@@ -51,15 +52,17 @@ func (c *ListCommand) Execute(args []string) error {
 		return err
 	}
 
+	if *help {
+		fmt.Fprintln(c.Output, `Usage:
+  wow list [--plain[=delimiter]] [--quiet]`)
+		fs.PrintDefaults()
+		return nil
+	}
+
 	ctx := context.Background()
 	entries, err := storage.ListMetadata(ctx, c.DB)
 	if err != nil {
 		return err
-	}
-
-	if *help {
-		fs.PrintDefaults()
-		return nil
 	}
 
 	if *plain != "" || !writerIsTerminal(c.Output) {
