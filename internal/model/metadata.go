@@ -15,8 +15,8 @@ type Metadata struct {
 func (m *Metadata) TypeIcon() string {
 	switch m.Type {
 	case "url":
-		return "🔗"
+		return "url"
 	default:
-		return "📄"
+		return "txt"
 	}
 }
