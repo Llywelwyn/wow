@@ -17,33 +17,65 @@ type Metadata struct {
 	Now func() time.Time
 }
 
+// TagUpdateResult reports the outcome of updating snippet tags.
+type TagUpdateResult struct {
+	Metadata model.Metadata
+	Added    []string
+	Removed  []string
+}
+
 // UpdateTags applies additions/removals to the existing tag set.
-func (m *Metadata) UpdateTags(ctx context.Context, rawKey string, add, remove []string) (model.Metadata, error) {
+func (m *Metadata) UpdateTags(ctx context.Context, rawKey string, add, remove []string) (TagUpdateResult, error) {
 	if m.DB == nil || m.Now == nil {
-		return model.Metadata{}, errors.New("metadata service misconfigured")
+		return TagUpdateResult{}, errors.New("metadata service misconfigured")
 	}
 
 	normalized, err := key.Normalize(rawKey)
 	if err != nil {
-		return model.Metadata{}, err
+		return TagUpdateResult{}, err
 	}
 
 	meta, err := storage.GetMetadata(ctx, m.DB, normalized)
 	if err != nil {
-		return model.Metadata{}, err
+		return TagUpdateResult{}, err
 	}
 
+	before := parseTags(meta.Tags)
 	updated := MergeTags(meta.Tags, add, remove)
-	if updated == meta.Tags {
-		return meta, nil
+	after := parseTags(updated)
+
+	added := diff(after, before)
+	removed := diff(before, after)
+
+	if updated != meta.Tags {
+		meta.Tags = updated
+		meta.Modified = m.Now().UTC()
+		if err := storage.UpdateMetadata(ctx, m.DB, meta); err != nil {
+			return TagUpdateResult{}, err
+		}
 	}
 
-	meta.Tags = updated
-	meta.Modified = m.Now().UTC()
+	return TagUpdateResult{
+		Metadata: meta,
+		Added:    added,
+		Removed:  removed,
+	}, nil
+}
 
-	if err := storage.UpdateMetadata(ctx, m.DB, meta); err != nil {
-		return model.Metadata{}, err
+func diff(a, b []string) []string {
+	if len(a) == 0 {
+		return nil
 	}
-
-	return meta, nil
+	set := make(map[string]struct{}, len(b))
+	for _, tag := range b {
+		set[tag] = struct{}{}
+	}
+	var out []string
+	for _, tag := range a {
+		if _, ok := set[tag]; ok {
+			continue
+		}
+		out = append(out, tag)
+	}
+	return out
 }

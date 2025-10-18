@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/services"
@@ -52,6 +53,9 @@ func (c *GetCommand) Execute(args []string) error {
 	}
 
 	keyArg := tagArgs.Others[0]
+	if strings.HasPrefix(keyArg, "-") {
+		return errors.New("key must be the first argument")
+	}
 	flagArgs := tagArgs.Others[1:]
 
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
@@ -64,27 +68,63 @@ func (c *GetCommand) Execute(args []string) error {
 		return err
 	}
 
+	addTags := append(splitTags(addCSV), tagArgs.Add...)
+	removeTags := append(splitTags(removeCSV), tagArgs.Remove...)
+	hasTagChange := len(addTags) > 0 || len(removeTags) > 0
+
 	path, err := key.ResolvePath(c.BaseDir, keyArg)
 	if err != nil {
 		return err
 	}
 
-	data, err := storage.Read(path)
+	if !hasTagChange {
+		data, err := storage.Read(path)
+		if err != nil {
+			return err
+		}
+		if _, err := c.Output.Write(data); err != nil {
+			return fmt.Errorf("write snippet to output: %w", err)
+		}
+		return nil
+	}
+
+	if c.Meta == nil {
+		return errors.New("metadata updates not supported")
+	}
+
+	result, err := c.Meta.UpdateTags(context.Background(), keyArg, addTags, removeTags)
 	if err != nil {
 		return err
 	}
 
-	if _, err := c.Output.Write(data); err != nil {
-		return fmt.Errorf("write snippet to output: %w", err)
-	}
+	return writeTagSummary(c.Output, result.Added, result.Removed)
+}
 
-	addTags := append(splitTags(addCSV), tagArgs.Add...)
-	removeTags := append(splitTags(removeCSV), tagArgs.Remove...)
-	if c.Meta != nil && (len(addTags) > 0 || len(removeTags) > 0) {
-		if _, err := c.Meta.UpdateTags(context.Background(), keyArg, addTags, removeTags); err != nil {
+func writeTagSummary(w io.Writer, added, removed []string) error {
+	if len(added) == 0 && len(removed) == 0 {
+		_, err := fmt.Fprintln(w, "tags unchanged")
+		return err
+	}
+	if len(added) > 0 {
+		if _, err := fmt.Fprintf(w, "added %s\n", formatTagList(added)); err != nil {
 			return err
 		}
 	}
-
+	if len(removed) > 0 {
+		if _, err := fmt.Fprintf(w, "removed %s\n", formatTagList(removed)); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func formatTagList(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	formatted := make([]string, len(tags))
+	for i, tag := range tags {
+		formatted[i] = "@" + tag
+	}
+	return strings.Join(formatted, " ")
 }

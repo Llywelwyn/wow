@@ -89,6 +89,10 @@ func TestGetCommandImplicitAddTag(t *testing.T) {
 		t.Fatalf("Get Execute error = %v", err)
 	}
 
+	if out.String() != "added @bar\n" {
+		t.Fatalf("output = %q, want %q", out.String(), "added @bar\n")
+	}
+
 	meta, err := storage.GetMetadata(context.Background(), cfg.DB, "go/foo")
 	if err != nil {
 		t.Fatalf("GetMetadata error = %v", err)
@@ -117,6 +121,10 @@ func TestGetCommandRemoveTag(t *testing.T) {
 
 	if err := getCmd.Execute([]string{"go/foo", "-@foo"}); err != nil {
 		t.Fatalf("Get Execute error = %v", err)
+	}
+
+	if out.String() != "removed @foo\n" {
+		t.Fatalf("output = %q, want %q", out.String(), "removed @foo\n")
 	}
 
 	meta, err := storage.GetMetadata(context.Background(), cfg.DB, "go/foo")
@@ -149,11 +157,42 @@ func TestGetCommandFlagTagging(t *testing.T) {
 		t.Fatalf("Get Execute error = %v", err)
 	}
 
+	want := "added @bar\nremoved @foo\n"
+	if out.String() != want {
+		t.Fatalf("output = %q, want %q", out.String(), want)
+	}
+
 	meta, err := storage.GetMetadata(context.Background(), cfg.DB, "go/foo")
 	if err != nil {
 		t.Fatalf("GetMetadata error = %v", err)
 	}
 	if meta.Tags != "bar" {
 		t.Fatalf("tags = %q, want bar", meta.Tags)
+	}
+}
+
+func TestGetCommandTagUnchanged(t *testing.T) {
+	cfg, saver, cleanup := setupGetTest(t)
+	defer cleanup()
+
+	saveCmd := &SaveCommand{
+		Saver:  saver,
+		Input:  strings.NewReader("content"),
+		Output: bytes.NewBuffer(nil),
+	}
+	if err := saveCmd.Execute([]string{"go/foo", "@foo"}); err != nil {
+		t.Fatalf("Save Execute error = %v", err)
+	}
+
+	var out bytes.Buffer
+	cfg.Output = &out
+	getCmd := NewGetCommand(cfg)
+
+	if err := getCmd.Execute([]string{"go/foo", "@foo"}); err != nil {
+		t.Fatalf("Get Execute error = %v", err)
+	}
+
+	if out.String() != "tags unchanged\n" {
+		t.Fatalf("output = %q, want %q", out.String(), "tags unchanged\n")
 	}
 }

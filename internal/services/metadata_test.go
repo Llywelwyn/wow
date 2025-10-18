@@ -33,12 +33,18 @@ func TestMetadataUpdateTags(t *testing.T) {
 	}
 
 	metaSvc := &Metadata{DB: db, Now: func() time.Time { return time.Unix(1_700_000_100, 0) }}
-	meta, err := metaSvc.UpdateTags(ctx, "go/foo", []string{"bar"}, []string{"foo"})
+	result, err := metaSvc.UpdateTags(ctx, "go/foo", []string{"bar"}, []string{"foo"})
 	if err != nil {
 		t.Fatalf("UpdateTags error = %v", err)
 	}
 
-	if meta.Tags != "bar" {
-		t.Fatalf("Tags = %q, want bar", meta.Tags)
+	if result.Metadata.Tags != "bar" {
+		t.Fatalf("Tags = %q, want bar", result.Metadata.Tags)
+	}
+	if len(result.Added) != 1 || result.Added[0] != "bar" {
+		t.Fatalf("Added = %v, want [bar]", result.Added)
+	}
+	if len(result.Removed) != 1 || result.Removed[0] != "foo" {
+		t.Fatalf("Removed = %v, want [foo]", result.Removed)
 	}
 }
