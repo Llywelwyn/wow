@@ -4,10 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"flag"
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"io"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -44,14 +43,29 @@ func (c *ListCommand) Execute(args []string) error {
 	}
 
 	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	plain := newPlainFlag()
-	fs.Var(plain, "plain", "plain output; optionally provide a delimiter (default: tab)")
-	verbose := fs.Bool("v", false, "verbose output")
-	fs.BoolVar(verbose, "verbose", false, "verbose output")
-
+	fs.SetOutput(c.Output)
+	var plain *string = fs.StringP("plain", "p", "", "removes pretty formatting; pass a string to override tab-delimiter")
+	fs.Lookup("plain").NoOptDefVal = "\t"
+	var quiet *bool = fs.BoolP("quiet", "q", false, "quiet output: only keys")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *help {
+		fmt.Fprintln(c.Output, `Usage:
+  wow list [--plain[=delimiter]] [--quiet]
+
+  Wow! Lists metadata for all the snippets you've got saved.
+
+  By default, output is pretty-printed as a table. When you
+  pipe the stdout elsewhere or pass --plain, the output is
+  tab-delimited and there's no header row to make scripting
+  easier. If you want to use a different delimiter, you can
+  pass it as an argument to --plain.`)
+		fmt.Fprintln(c.Output)
+		fs.PrintDefaults()
+		return nil
 	}
 
 	ctx := context.Background()
@@ -60,76 +74,10 @@ func (c *ListCommand) Execute(args []string) error {
 		return err
 	}
 
-	modePlain := plain.Requested() || !writerIsTerminal(c.Output)
-	delimiter := plain.Delimiter()
-	if modePlain {
-		return renderPlain(c.Output, entries, *verbose, delimiter)
+	if *plain != "" || !writerIsTerminal(c.Output) {
+		return renderPlain(c.Output, entries, *quiet, *plain)
 	}
-	return renderPretty(c.Output, entries, *verbose)
-}
-
-type plainFlag struct {
-	requested bool
-	delimiter string
-}
-
-func newPlainFlag() *plainFlag {
-	return &plainFlag{
-		delimiter: "\t",
-	}
-}
-
-func (p *plainFlag) String() string {
-	if !p.requested {
-		return ""
-	}
-	return p.delimiter
-}
-
-func (p *plainFlag) Set(value string) error {
-	switch value {
-	case "", "true":
-		p.requested = true
-		p.delimiter = "\t"
-		return nil
-	case "false":
-		p.requested = false
-		p.delimiter = "\t"
-		return nil
-	}
-
-	del, err := parseDelimiter(value)
-	if err != nil {
-		return err
-	}
-
-	p.requested = true
-	p.delimiter = del
-	return nil
-}
-
-func (p *plainFlag) IsBoolFlag() bool {
-	return true
-}
-
-func (p *plainFlag) Requested() bool {
-	return p.requested
-}
-
-func (p *plainFlag) Delimiter() string {
-	return p.delimiter
-}
-
-func parseDelimiter(val string) (string, error) {
-	if val == "" {
-		return "\t", nil
-	}
-
-	if parsed, err := strconv.Unquote(`"` + val + `"`); err == nil {
-		return parsed, nil
-	}
-
-	return val, nil
+	return renderPretty(c.Output, entries, *quiet)
 }
 
 func writerIsTerminal(w io.Writer) bool {
@@ -143,20 +91,21 @@ func writerIsTerminal(w io.Writer) bool {
 	return false
 }
 
-func renderPlain(w io.Writer, entries []model.Metadata, verbose bool, delimiter string) error {
+func renderPlain(w io.Writer, entries []model.Metadata, quiet bool, delimiter string) error {
 	for _, meta := range entries {
 		var fields []string
-		if verbose {
+		if quiet {
+			fields = []string{meta.Key}
+		} else {
 			fields = []string{
 				meta.Key,
-				meta.Created.UTC().Format(time.RFC3339),
-				meta.Modified.UTC().Format(time.RFC3339),
 				meta.Tags,
 				meta.Description,
+				meta.Created.UTC().Format(time.RFC3339),
+				meta.Modified.UTC().Format(time.RFC3339),
 			}
-		} else {
-			fields = []string{meta.Key}
 		}
+
 		if _, err := fmt.Fprintln(w, strings.Join(fields, delimiter)); err != nil {
 			return err
 		}
@@ -164,25 +113,25 @@ func renderPlain(w io.Writer, entries []model.Metadata, verbose bool, delimiter 
 	return nil
 }
 
-func renderPretty(w io.Writer, entries []model.Metadata, verbose bool) error {
+func renderPretty(w io.Writer, entries []model.Metadata, quiet bool) error {
 	tw := tabwriter.NewWriter(w, 2, 4, 2, ' ', 0)
-	if verbose {
-		fmt.Fprintln(tw, "KEY\tCREATED\tMODIFIED\tTAGS\tDESCRIPTION")
+	if quiet {
+		fmt.Fprintln(tw, "KEY")
 	} else {
-		fmt.Fprintln(tw, "KEY\tTAGS")
+		fmt.Fprintln(tw, "KEY\tTAGS\tMODIFIED\tCREATED\tDESCRIPTION")
 	}
 
 	for _, meta := range entries {
-		if verbose {
+		if quiet {
+			fmt.Fprintf(tw, "%s\n", meta.Key)
+		} else {
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 				meta.Key,
+				meta.Tags,
 				meta.Created.UTC().Format(time.RFC3339),
 				meta.Modified.UTC().Format(time.RFC3339),
-				meta.Tags,
 				meta.Description,
 			)
-		} else {
-			fmt.Fprintf(tw, "%s\t%s\n", meta.Key, meta.Tags)
 		}
 	}
 

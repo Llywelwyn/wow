@@ -3,6 +3,10 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+
+	flag "github.com/spf13/pflag"
 
 	"github.com/llywelwyn/wow/internal/services"
 )
@@ -30,9 +34,25 @@ func (c *RemoveCommand) Execute(args []string) error {
 	if c.Remover == nil {
 		return errors.New("remove command not configured")
 	}
-	if len(args) == 0 {
+
+	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	var help *bool = fs.BoolP("help", "h", false, "display help")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if *help {
+		fmt.Fprintln(os.Stdout, `Usage:
+  wow remove <key>`)
+		fs.PrintDefaults()
+		return nil
+	}
+
+	remaining := fs.Args()
+	if len(remaining) == 0 {
 		return errors.New("key required")
 	}
-	key := args[0]
+	key := remaining[0]
 	return c.Remover.Remove(context.Background(), key)
 }

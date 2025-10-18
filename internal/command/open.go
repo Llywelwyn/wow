@@ -3,10 +3,11 @@ package command
 import (
 	"context"
 	"errors"
-	"flag"
-	"io"
+	"fmt"
+	"os"
 
 	"github.com/llywelwyn/wow/internal/services"
+	flag "github.com/spf13/pflag"
 )
 
 type openHandler interface {
@@ -40,12 +41,19 @@ func (c *OpenCommand) Execute(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("open", flag.ContinueOnError)
-	pager := fs.Bool("pager", false, "view snippet in pager")
-	fs.BoolVar(pager, "p", false, "view snippet in pager")
-	fs.SetOutput(io.Discard)
+	fs.SetOutput(os.Stdout)
+	var pager *bool = fs.BoolP("pager", "p", false, "view snippet in pager")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
 
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *help {
+		fmt.Fprintln(os.Stdout, `Usage:
+  wow open <key> [--pager]`)
+		fs.PrintDefaults()
+		return nil
 	}
 
 	remaining := fs.Args()

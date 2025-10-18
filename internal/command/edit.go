@@ -3,6 +3,10 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+
+	flag "github.com/spf13/pflag"
 
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/services"
@@ -38,9 +42,25 @@ func (c *EditCommand) Execute(args []string) error {
 	if c.Editor == nil {
 		return errors.New("edit command not configured")
 	}
-	if len(args) != 1 {
+
+	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
+	fs.SetOutput(os.Stdout)
+	var help *bool = fs.BoolP("help", "h", false, "display help")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if *help {
+		fmt.Fprintln(os.Stdout, `Usage:
+  wow edit <key>`)
+		fs.PrintDefaults()
+		return nil
+	}
+
+	remaining := fs.Args()
+	if len(remaining) != 1 {
 		return errors.New("edit expects exactly one key")
 	}
-	_, err := c.Editor.Edit(context.Background(), args[0])
+	_, err := c.Editor.Edit(context.Background(), remaining[0])
 	return err
 }

@@ -1,0 +1,8 @@
+$ setenv WOW_HOME ${ROOTDIR}/home
+$ setenv WOW_OPENER printf
+$ setenv WOW_PAGER cat
+$ fecho url.txt https://example.com
+$ wow save links/site < url.txt
+links/site
+$ wow open links/site
+https://example.com
