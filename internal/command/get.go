@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	flag "github.com/spf13/pflag"
 	"io"
 	"strings"
+
+	flag "github.com/spf13/pflag"
 
 	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
+	"github.com/llywelwyn/wow/internal/ui"
 )
 
 // GetCommand streams snippet content to stdout and optionally mutates tags.
@@ -160,17 +162,19 @@ func (c *GetCommand) Execute(args []string) error {
 }
 
 func writeTagSummary(w io.Writer, added, removed []string) error {
+	styles := ui.DefaultStyles()
+
 	if len(added) == 0 && len(removed) == 0 {
-		_, err := fmt.Fprintln(w, "tags unchanged")
+		_, err := fmt.Fprintln(w, styles.Subtle.Render("tags unchanged"))
 		return err
 	}
 	if len(added) > 0 {
-		if _, err := fmt.Fprintf(w, "added %s\n", formatTagList(added)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Positive.Render("added"), formatTagList(added)); err != nil {
 			return err
 		}
 	}
 	if len(removed) > 0 {
-		if _, err := fmt.Fprintf(w, "removed %s\n", formatTagList(removed)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Negative.Render("removed"), formatTagList(removed)); err != nil {
 			return err
 		}
 	}
@@ -181,9 +185,15 @@ func formatTagList(tags []string) string {
 	if len(tags) == 0 {
 		return ""
 	}
-	formatted := make([]string, len(tags))
-	for i, tag := range tags {
-		formatted[i] = "@" + tag
+	styles := ui.DefaultStyles()
+
+	formatted := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		formatted = append(formatted, styles.Tag.Render("@"+tag))
 	}
 	return strings.Join(formatted, " ")
 }

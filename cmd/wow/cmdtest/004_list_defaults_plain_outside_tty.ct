@@ -4,12 +4,12 @@ $ wow save notes/demo < input.txt
 notes/demo
 $ wow save notes/demo2 < input.txt
 notes/demo2
-$ wow ls --quiet
+$ wow ls
 notes/demo2
 notes/demo
 $ wow save notes/demo3 < input.txt
 notes/demo3
-$ wow ls -q
+$ wow ls
 notes/demo3
 notes/demo2
 notes/demo

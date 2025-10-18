@@ -42,7 +42,7 @@ func newListCommand(t *testing.T, metas []model.Metadata) (*ListCommand, func())
 	return cmd, cleanup
 }
 
-func TestListCommandQuiet(t *testing.T) {
+func TestListCommandDefaultPlain(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	cmd, cleanup := newListCommand(t, []model.Metadata{
 		{Key: "first", Created: now.Add(-time.Hour), Modified: now.Add(-time.Hour)},
@@ -53,7 +53,7 @@ func TestListCommandQuiet(t *testing.T) {
 	var out bytes.Buffer
 	cmd.Output = &out
 
-	if err := cmd.Execute([]string{"--quiet"}); err != nil {
+	if err := cmd.Execute(nil); err != nil {
 		t.Fatalf("Execute error = %v", err)
 	}
 

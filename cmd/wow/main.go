@@ -123,18 +123,24 @@ func printUsage() {
   wow get <key> [--tag string] [--untag string] [@tag] [-@tag]	Explicit get
   wow open <key> [--pager]                                    	Open snippet or view in pager
   wow edit <key>                                              	Edit snippet in $WOW_EDITOR or $EDITOR
-  wow list [--plain] [--quiet]                                	List saved snippets (alias: ls)
+  wow list [--plain] [--with-tags] [--with-type] [--with-desc]	List saved snippets (alias: ls)
+           [--with-dates] [--all]                             
   wow remove <key>                                            	Remove snippet (alias: rm)
 
   Run any command with --help for more info on that specific command.
 
-  Any flags can be written in shorthand (with a single dash, and their first letter).
-  For example:
-   wow list --plain --quiet 	-->	wow ls -pq
-   wow <key> --tag tag1,tag2	-->	wow <key> -t=tag1,tag2
+  Many flags support being written in shorthand. You can see all the
+  flags with shorthands in the --help menu for specific commands. If
+  a flag is written in its short form, it can be combined with other
+  short flags into one entity.
 
+  For example, the "wow list" command supports -p for --plain and -q
+  for --quiet. You can invoke a quiet, plain list as "wow list -qp".
 
-  When combining short flags, only the final flag can accept an argument. If you need
-  to pass arguments to multiple flags, they must be written separately.
+  When combining short flags like this, only the final flag can have
+  an argument. --plain supports a custom value for its delimiter, so
+  using the above example, these two commands are identical:
+    - wow list -qp=","
+    - wow list --quiet --plain=","
 `)
 }
