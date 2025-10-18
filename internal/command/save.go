@@ -3,8 +3,8 @@ package command
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"io"
 	"strings"
 
@@ -46,10 +46,9 @@ func (c *SaveCommand) Execute(args []string) error {
 	args = tagArgs.Others
 
 	fs := flag.NewFlagSet("save", flag.ContinueOnError)
-	desc := fs.String("desc", "", "description")
-	var tagsCSV string
-	fs.StringVar(&tagsCSV, "tag", "", "comma-separated tags")
-	fs.SetOutput(io.Discard)
+	var desc *string = fs.StringP("desc", "d", "", "description")
+	var tags *string = fs.StringP("tag", "t", "", "comma-separated tags, e.g. one,two")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
 
 	var keyArg string
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
@@ -61,7 +60,13 @@ func (c *SaveCommand) Execute(args []string) error {
 		return err
 	}
 
-	addTags := append(splitTags(tagsCSV), tagArgs.Add...)
+	if *help {
+		fs.PrintDefaults()
+
+		return nil
+	}
+
+	addTags := append(splitTags(*tags), tagArgs.Add...)
 
 	res, err := c.Saver.Save(context.Background(), services.SaveRequest{
 		Key:         keyArg,

@@ -3,8 +3,8 @@ package command
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
+	flag "github.com/spf13/pflag"
 	"io"
 	"strings"
 
@@ -59,17 +59,20 @@ func (c *GetCommand) Execute(args []string) error {
 	flagArgs := tagArgs.Others[1:]
 
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
-	var addCSV, removeCSV string
-	fs.StringVar(&addCSV, "tag", "", "comma-separated tags to add")
-	fs.StringVar(&removeCSV, "untag", "", "comma-separated tags to remove")
-	fs.SetOutput(io.Discard)
-
+	var addCSV *string = fs.StringP("tag", "t", "", "comma-separated tags to add")
+	var removeCSV *string = fs.StringP("untag", "u", "", "comma-separated tags to remove")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
 	if err := fs.Parse(flagArgs); err != nil {
 		return err
 	}
 
-	addTags := append(splitTags(addCSV), tagArgs.Add...)
-	removeTags := append(splitTags(removeCSV), tagArgs.Remove...)
+	if *help {
+		fs.PrintDefaults()
+		return nil
+	}
+
+	addTags := append(splitTags(*addCSV), tagArgs.Add...)
+	removeTags := append(splitTags(*removeCSV), tagArgs.Remove...)
 	hasTagChange := len(addTags) > 0 || len(removeTags) > 0
 
 	path, err := key.ResolvePath(c.BaseDir, keyArg)
