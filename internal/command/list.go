@@ -101,12 +101,16 @@ func renderPlain(w io.Writer, entries []model.Metadata, quiet bool, delimiter st
 		if quiet {
 			fields = []string{meta.Key}
 		} else {
+			modified := ""
+			if !meta.Modified.Equal(meta.Created) {
+				modified = meta.Modified.UTC().Format(time.DateOnly)
+			}
 			fields = []string{
 				meta.Key,
 				meta.Tags,
 				meta.Description,
-				meta.Created.UTC().Format(time.RFC3339),
-				meta.Modified.UTC().Format(time.RFC3339),
+				meta.Created.UTC().Format(time.DateOnly),
+				modified,
 			}
 		}
 
@@ -122,19 +126,24 @@ func renderPretty(w io.Writer, entries []model.Metadata, quiet bool) error {
 	if quiet {
 		fmt.Fprintln(tw, "KEY")
 	} else {
-		fmt.Fprintln(tw, "KEY\tTAGS\tMODIFIED\tCREATED\tDESCRIPTION")
+		fmt.Fprintln(tw, "KEY\tTAGS\tDESCRIPTION\tCREATED\tMODIFIED")
 	}
 
 	for _, meta := range entries {
 		if quiet {
-			fmt.Fprintf(tw, "%s\n", meta.Key)
+			fmt.Fprintf(tw, "%s %s\n", meta.TypeIcon(), meta.Key)
 		} else {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+			modified := ""
+			if !meta.Modified.Equal(meta.Created) {
+				modified = meta.Modified.UTC().Format(time.DateOnly)
+			}
+			fmt.Fprintf(tw, "%s %s\t%s\t%s\t%s\t%s\n",
+				meta.TypeIcon(),
 				meta.Key,
 				meta.Tags,
-				meta.Created.UTC().Format(time.RFC3339),
-				meta.Modified.UTC().Format(time.RFC3339),
 				meta.Description,
+				meta.Created.UTC().Format(time.DateOnly),
+				modified,
 			)
 		}
 	}
