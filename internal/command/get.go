@@ -115,7 +115,7 @@ func (c *GetCommand) Execute(args []string) error {
 
   Some examples:
     wow foo             -->  fetches the content of "foo".
-	wow foo @bar -@baz  -->  adds "bar" and removes "baz" from tags.
+    wow foo @bar -@baz  -->  adds "bar" and removes "baz" from tags.
 	wow foo --tag 1,2   -->  adds "1" and "2" to tags.`)
 		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
