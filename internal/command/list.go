@@ -54,7 +54,16 @@ func (c *ListCommand) Execute(args []string) error {
 
 	if *help {
 		fmt.Fprintln(c.Output, `Usage:
-  wow list [--plain[=delimiter]] [--quiet]`)
+  wow list [--plain[=delimiter]] [--quiet]
+
+  Wow! Lists metadata for all the snippets you've got saved.
+
+  By default, output is pretty-printed as a table. When you
+  pipe the stdout elsewhere or pass --plain, the output is
+  tab-delimited and there's no header row to make scripting
+  easier. If you want to use a different delimiter, you can
+  pass it as an argument to --plain.`)
+		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
 		return nil
 	}
@@ -114,7 +123,7 @@ func renderPretty(w io.Writer, entries []model.Metadata, quiet bool) error {
 
 	for _, meta := range entries {
 		if quiet {
-			fmt.Fprintf(tw, "%s", meta.Key)
+			fmt.Fprintf(tw, "%s\n", meta.Key)
 		} else {
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 				meta.Key,

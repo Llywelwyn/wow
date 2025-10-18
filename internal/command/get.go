@@ -54,8 +54,6 @@ func (c *GetCommand) Execute(args []string) error {
 	var addCSV *string = fs.StringP("tag", "t", "", "comma-separated tags to add")
 	var removeCSV *string = fs.StringP("untag", "u", "", "comma-separated tags to remove")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
-	usage := `Usage:
-  wow get <key> [--tag tags] [--untag tags] [@tag ...] [-@tag ...]`
 
 	if len(tagArgs.Others) == 0 {
 		return errors.New("key required")
@@ -66,9 +64,32 @@ func (c *GetCommand) Execute(args []string) error {
 		if err := fs.Parse(tagArgs.Others); err != nil {
 			return err
 		}
+		// TODO: This is completely duplicated. Dedupe this with a refactor of parsing --help on implicit Gets.
 		if *help {
-			fmt.Fprintln(c.Output, usage)
+			fmt.Fprintln(c.Output, `Usage:
+  wow get <key> [--tag tag1,tag2] [--untag tag1] [@tag1 @tag2] [-@tag1]
+
+  Wow! Fetches a snippet, or modifies its metadata.
+
+  You can get implicitly by running "wow <key>"
+  without the "get" keyword. Provided no input
+  was piped in, wow! guesses you want to fetch.
+
+  If you add any flags, rather than outputting
+  the content of the snippet, wow! will update
+  the metadata instead. 
+
+  Some examples:
+    wow foo             -->  fetches the content of "foo".
+    wow foo @bar -@baz  -->  adds "bar" and removes "baz" from tags.
+    wow foo --tag 1,2   -->  adds "1" and "2" to tags.`)
+			fmt.Fprintln(c.Output)
 			fs.PrintDefaults()
+			fmt.Fprintln(c.Output, `
+  PS.
+    You wont be able to implicitly get if your
+    key collides with another command. In that
+    case, you need to specify: "wow get <key>"`)
 			return nil
 		}
 		return errors.New("key must be the first argument")
@@ -79,8 +100,30 @@ func (c *GetCommand) Execute(args []string) error {
 	}
 
 	if *help {
-		fmt.Fprintln(c.Output, usage)
+		fmt.Fprintln(c.Output, `Usage:
+  wow get <key> [--tag tag1,tag2] [--untag tag1] [@tag1 @tag2] [-@tag1]
+
+  Wow! Fetches a snippet, or modifies its metadata.
+
+  You can get implicitly by running "wow <key>"
+  without the "get" keyword. Provided no input
+  was piped in, wow! guesses you want to fetch.
+
+  If you add any flags, rather than outputting
+  the content of the snippet, wow! will update
+  the metadata instead. 
+
+  Some examples:
+    wow foo             -->  fetches the content of "foo".
+	wow foo @bar -@baz  -->  adds "bar" and removes "baz" from tags.
+	wow foo --tag 1,2   -->  adds "1" and "2" to tags.`)
+		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
+		fmt.Fprintln(c.Output, `
+  PS.
+    You wont be able to implicitly get if your
+    key collides with another command. In that
+    case, you need to specify: "wow get <key>"`)
 		return nil
 	}
 
