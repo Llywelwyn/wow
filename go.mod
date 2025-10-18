@@ -4,6 +4,8 @@ go 1.25.2
 
 require github.com/mattn/go-sqlite3 v1.14.22
 
+require github.com/spf13/pflag v1.0.10
+
 require (
 	github.com/google/go-cmdtest v0.4.0
 	github.com/google/go-cmp v0.6.0 // indirect
