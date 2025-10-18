@@ -1,8 +1,8 @@
- #!/usr/bin/env bash
-  set -euo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
-  SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  cd "$SCRIPT_DIR"
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-  go test ./cmd/wow -run TestCmdtests -v
+go test ./cmd/wow -run TestCmdtests -v
 
