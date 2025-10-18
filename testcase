@@ -54,7 +54,7 @@ cp -- "$src" "$dst"
 echo "created: $dst"
 echo "based on: $src"
 
-if [[ -n "$EDITOR:-}" ]]; then
+if [[ -n "${EDITOR:-}" ]]; then
     read -rp "open in $EDITOR?" yn
     if [[ "$yn" =~ ^[Yy]$ ]]; then
         "$EDITOR" "$dst"
