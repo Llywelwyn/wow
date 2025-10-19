@@ -65,7 +65,7 @@ func (c *ListCommand) Execute(args []string) error {
 	var withType *bool = fs.BoolP("type", "T", false, "include snippet type")
 	var all *bool = fs.BoolP("all", "a", false, "overrides --limit and any defaults, showing every listing")
 	var verbose *bool = fs.BoolP("verbose", "v", false, "show all metadata fields")
-	var limit *int = fs.IntP("limit", "l", 50, "maximum number of snippets to display per page (default: 50)")
+	var limit *int = fs.IntP("limit", "l", 50, "maximum number of snippets to display per page")
 	var page *int = fs.IntP("page", "p", 1, "page number (1-based)")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
 	if err := fs.Parse(args); err != nil {
@@ -83,8 +83,8 @@ func (c *ListCommand) Execute(args []string) error {
 
   By default there's a limit of 50 listings per page.
      --page lets you view different pages.
-	 --all removes this limit entirely.
-	 --limit lets you change it for this query.
+     --all removes this limit entirely.
+     --limit lets you change it for this query.
 
   Use --limit and --page for pagination. If you've got 1000
   listings, --limit 5 will split into 200 pages of 5.
