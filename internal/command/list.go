@@ -69,16 +69,23 @@ func (c *ListCommand) Execute(args []string) error {
 	if *help {
 		fmt.Fprintln(c.Output, `Usage:
   wow list [--plain[=delimiter]] [--with-tags] [--with-type]
-          [--with-desc] [--with-dates] [--all]
+          [--with-desc] [--with-dates] [--all/--verbose]
 
   Wow! Lists metadata for all the snippets you've got saved.
 
-  By default, output shows only snippet keys optimised for
-  quick scanning. When you run it in a terminal, we render a
-  tree view; otherwise or when you pass --plain, the output is
-  tab-delimited without any styling. You can add more context
-  with --with-tags, --with-type, --with-desc, or --with-dates.
-  Use --all (or --verbose) to enable every field at once.`)
+  List output is totally modular and can be adjusted with flags so
+  only what you care about gets displayed. Running "wow list" with
+  no flags shows a simple list of snippet keys.
+
+  You can add fields one-by-one with flags or call list with --all
+  to see all available information about each entry.
+
+  Importantly: the view you see when you run "wow list" is pretty.
+  Whenever you pipe the output somewhere else, the --plain flag is
+  forcibly enabled to make parsing the data easier.
+
+  --plain output is tab-delimited by default, but the flag accepts
+  any string as an override if you prefer a different format.`)
 		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
 		return nil
