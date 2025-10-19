@@ -193,7 +193,7 @@ func buildRootLine(meta model.Metadata, styles ui.Styles, wrap lipgloss.Style, o
 	base := buildKeyLine(meta, styles, opts)
 	if opts.WithTags {
 		if tags := styledTagList(meta.Tags, styles); tags != "" {
-			base = fmt.Sprintf("%s  %s", base, tags)
+			base = fmt.Sprintf("%s %s", base, tags)
 		}
 	}
 	return wrap.Render(base)
