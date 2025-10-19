@@ -55,10 +55,10 @@ func (c *ListCommand) Execute(args []string) error {
 	fs.SetOutput(c.Output)
 	var plain *string = fs.StringP("plain", "p", "", "removes pretty formatting; pass a string to override tab-delimiter")
 	fs.Lookup("plain").NoOptDefVal = "\t"
-	var withTags *bool = fs.Bool("with-tags", false, "include tags")
-	var withDates *bool = fs.Bool("with-dates", false, "include created/updated dates")
-	var withDesc *bool = fs.Bool("with-desc", false, "include descriptions")
-	var withType *bool = fs.Bool("with-type", false, "include snippet type")
+	var withTags *bool = fs.BoolP("with-tags", "t", false, "include tags")
+	var withDates *bool = fs.BoolP("with-dates", "D", false, "include created/updated dates")
+	var withDesc *bool = fs.BoolP("with-desc", "d", false, "include descriptions")
+	var withType *bool = fs.BoolP("with-type", "T", false, "include snippet type")
 	var all *bool = fs.BoolP("all", "a", false, "include all metadata (tags, type, dates, description)")
 	var verbose *bool = fs.BoolP("verbose", "v", false, "alias for --all")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
@@ -300,14 +300,14 @@ func plainTagList(raw string) string {
 
 func compactEnumerator(children tree.Children, index int) string {
 	if children.Length()-1 == index {
-		return "└─"
+		return "└─ "
 	}
-	return "├─"
+	return "├─ "
 }
 
 func compactIndenter(children tree.Children, index int) string {
 	if children.Length()-1 == index {
-		return "  "
+		return "   "
 	}
-	return "│ "
+	return "│  "
 }
