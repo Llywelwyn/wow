@@ -81,6 +81,11 @@ func run() error {
 		return nil
 	}
 
+	if args[0] == "--help" || args[0] == "-h" {
+		printUsage()
+		return nil
+	}
+
 	// Check for explicit command in args[0]
 	// and execute if a match is found.
 	if cmd, ok := dispatcher.Lookup(args[0]); ok {
@@ -111,14 +116,26 @@ func stdinHasData() (bool, error) {
 
 func printUsage() {
 	fmt.Fprintf(os.Stdout, `Usage:
-  wow [key]                        Retrieve snippet when no stdin data
-  wow [key] < file                 Save snippet with explicit key
-  wow < file                       Save snippet with auto-generated key
-  wow save [key]                   Explicit save
-  wow get <key>                    Explicit get
-  wow open <key> [--pager]         Open snippet or view in pager
-  wow edit <key>                   Edit snippet in $WOW_EDITOR or $EDITOR
-  wow list [--verbose] [--plain]   List saved snippets (alias: ls)
-  wow remove <key>                 Remove snippet (alias: rm)
+  wow [key] [--tag string] [--untag string] [@tag] [-@tag]    	Retrieve snippet when no stdin data
+  wow <key> [--tag string] [@tag] [--desc string] < file      	Save snippet with explicit key
+  wow [--tag string] [@tag] [--desc string] < file            	Save snippet with auto-generated key
+  wow save <key> [--tag string] [@tag] [--desc string] < file	Explicit save
+  wow get <key> [--tag string] [--untag string] [@tag] [-@tag]	Explicit get
+  wow open <key> [--pager]                                    	Open snippet or view in pager
+  wow edit <key>                                              	Edit snippet in $WOW_EDITOR or $EDITOR
+  wow list [--plain] [--with-tags] [--with-type] [--with-desc]	List saved snippets (alias: ls)
+           [--with-dates] [--all/--verbose]                   
+  wow remove <key>                                            	Remove snippet (alias: rm)
+
+  Run any command with --help for more info on that specific command.
+
+  Many flags support being written in shorthand, usually by using one
+  dash and the first letter of the flag name. For example, --help can
+  be called with -h. Combining multiple shorthand flags is also easy,
+  by just writing all the letters in one, in any order you like.
+
+  For example, "wow list" can be made --plain and --verbose with -vp.
+
+  You can see which flags support shorthands with "wow [command] -h".
 `)
 }

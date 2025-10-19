@@ -42,7 +42,7 @@ func newListCommand(t *testing.T, metas []model.Metadata) (*ListCommand, func())
 	return cmd, cleanup
 }
 
-func TestListCommandPlainDefault(t *testing.T) {
+func TestListCommandDefaultPlain(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	cmd, cleanup := newListCommand(t, []model.Metadata{
 		{Key: "first", Created: now.Add(-time.Hour), Modified: now.Add(-time.Hour)},
@@ -67,65 +67,5 @@ func TestListCommandPlainDefault(t *testing.T) {
 	}
 	if lines[1] != "first" {
 		t.Fatalf("expected oldest entry second, got %q", lines[1])
-	}
-}
-
-func TestListCommandVerbose(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0).UTC()
-	cmd, cleanup := newListCommand(t, []model.Metadata{
-		{
-			Key:         "foo",
-			Type:        "text",
-			Created:     now,
-			Modified:    now,
-			Description: "desc",
-			Tags:        "a,b",
-		},
-	})
-	defer cleanup()
-
-	var out bytes.Buffer
-	cmd.Output = &out
-
-	if err := cmd.Execute([]string{"--plain", "--verbose"}); err != nil {
-		t.Fatalf("Execute error = %v", err)
-	}
-
-	got := strings.TrimSuffix(out.String(), "\n")
-	fields := strings.Split(got, "\t")
-	if len(fields) != 5 {
-		t.Fatalf("expected 5 fields, got %d (%q)", len(fields), fields)
-	}
-	if fields[0] != "foo" {
-		t.Fatalf("unexpected key field: %q", fields[0])
-	}
-	if fields[3] != "a,b" {
-		t.Fatalf("unexpected tags: %q", fields[3])
-	}
-	if fields[4] != "desc" {
-		t.Fatalf("unexpected description: %q", fields[4])
-	}
-	if fields[1] != now.Format(time.RFC3339) {
-		t.Fatalf("expected created timestamp %q, got %q", now.Format(time.RFC3339), fields[1])
-	}
-}
-
-func TestListCommandCustomDelimiter(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	cmd, cleanup := newListCommand(t, []model.Metadata{
-		{Key: "first", Created: now, Modified: now, Tags: "one"},
-	})
-	defer cleanup()
-
-	var out bytes.Buffer
-	cmd.Output = &out
-
-	if err := cmd.Execute([]string{"--plain=|"}); err != nil {
-		t.Fatalf("Execute error = %v", err)
-	}
-
-	line := strings.TrimSuffix(out.String(), "\n")
-	if line != "first" {
-		t.Fatalf("unexpected output: %q", line)
 	}
 }

@@ -4,24 +4,32 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/tree"
+	flag "github.com/spf13/pflag"
 	"golang.org/x/term"
 
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/storage"
+	"github.com/llywelwyn/wow/internal/ui"
 )
 
 // ListCommand prints snippet metadata.
 type ListCommand struct {
 	DB     *sql.DB
 	Output io.Writer
+}
+
+type listViewOptions struct {
+	WithTags  bool
+	WithDates bool
+	WithDesc  bool
+	WithType  bool
 }
 
 // NewListCommand constructs a ListCommand using defaults from cfg.
@@ -44,14 +52,43 @@ func (c *ListCommand) Execute(args []string) error {
 	}
 
 	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	plain := newPlainFlag()
-	fs.Var(plain, "plain", "plain output; optionally provide a delimiter (default: tab)")
-	verbose := fs.Bool("v", false, "verbose output")
-	fs.BoolVar(verbose, "verbose", false, "verbose output")
-
+	fs.SetOutput(c.Output)
+	var plain *string = fs.StringP("plain", "p", "", "removes pretty formatting; pass a string to override tab-delimiter")
+	fs.Lookup("plain").NoOptDefVal = "\t"
+	var withTags *bool = fs.Bool("with-tags", false, "include tags")
+	var withDates *bool = fs.Bool("with-dates", false, "include created/updated dates")
+	var withDesc *bool = fs.Bool("with-desc", false, "include descriptions")
+	var withType *bool = fs.Bool("with-type", false, "include snippet type")
+	var all *bool = fs.BoolP("all", "a", false, "include all metadata (tags, type, dates, description)")
+	var verbose *bool = fs.BoolP("verbose", "v", false, "alias for --all")
+	var help *bool = fs.BoolP("help", "h", false, "display help")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *help {
+		fmt.Fprintln(c.Output, `Usage:
+  wow list [--plain[=delimiter]] [--with-tags] [--with-type]
+          [--with-desc] [--with-dates] [--all/--verbose]
+
+  Wow! Lists metadata for all the snippets you've got saved.
+
+  List output is totally modular and can be adjusted with flags so
+  only what you care about gets displayed. Running "wow list" with
+  no flags shows a simple list of snippet keys.
+
+  You can add fields one-by-one with flags or call list with --all
+  to see all available information about each entry.
+
+  Importantly: the view you see when you run "wow list" is pretty.
+  Whenever you pipe the output somewhere else, the --plain flag is
+  forcibly enabled to make parsing the data easier.
+
+  --plain output is tab-delimited by default, but the flag accepts
+  any string as an override if you prefer a different format.`)
+		fmt.Fprintln(c.Output)
+		fs.PrintDefaults()
+		return nil
 	}
 
 	ctx := context.Background()
@@ -60,76 +97,22 @@ func (c *ListCommand) Execute(args []string) error {
 		return err
 	}
 
-	modePlain := plain.Requested() || !writerIsTerminal(c.Output)
-	delimiter := plain.Delimiter()
-	if modePlain {
-		return renderPlain(c.Output, entries, *verbose, delimiter)
-	}
-	return renderPretty(c.Output, entries, *verbose)
-}
-
-type plainFlag struct {
-	requested bool
-	delimiter string
-}
-
-func newPlainFlag() *plainFlag {
-	return &plainFlag{
-		delimiter: "\t",
-	}
-}
-
-func (p *plainFlag) String() string {
-	if !p.requested {
-		return ""
-	}
-	return p.delimiter
-}
-
-func (p *plainFlag) Set(value string) error {
-	switch value {
-	case "", "true":
-		p.requested = true
-		p.delimiter = "\t"
-		return nil
-	case "false":
-		p.requested = false
-		p.delimiter = "\t"
-		return nil
+	useAll := *all || *verbose
+	opts := listViewOptions{
+		WithTags:  *withTags || useAll,
+		WithDates: *withDates || useAll,
+		WithDesc:  *withDesc || useAll,
+		WithType:  *withType || useAll,
 	}
 
-	del, err := parseDelimiter(value)
-	if err != nil {
-		return err
+	if *plain != "" || !writerIsTerminal(c.Output) {
+		delimiter := *plain
+		if delimiter == "" {
+			delimiter = "\t"
+		}
+		return renderPlainList(c.Output, entries, opts, delimiter)
 	}
-
-	p.requested = true
-	p.delimiter = del
-	return nil
-}
-
-func (p *plainFlag) IsBoolFlag() bool {
-	return true
-}
-
-func (p *plainFlag) Requested() bool {
-	return p.requested
-}
-
-func (p *plainFlag) Delimiter() string {
-	return p.delimiter
-}
-
-func parseDelimiter(val string) (string, error) {
-	if val == "" {
-		return "\t", nil
-	}
-
-	if parsed, err := strconv.Unquote(`"` + val + `"`); err == nil {
-		return parsed, nil
-	}
-
-	return val, nil
+	return renderStyledList(c.Output, entries, opts)
 }
 
 func writerIsTerminal(w io.Writer) bool {
@@ -143,20 +126,27 @@ func writerIsTerminal(w io.Writer) bool {
 	return false
 }
 
-func renderPlain(w io.Writer, entries []model.Metadata, verbose bool, delimiter string) error {
+func renderPlainList(w io.Writer, entries []model.Metadata, opts listViewOptions, delimiter string) error {
 	for _, meta := range entries {
-		var fields []string
-		if verbose {
-			fields = []string{
-				meta.Key,
-				meta.Created.UTC().Format(time.RFC3339),
-				meta.Modified.UTC().Format(time.RFC3339),
-				meta.Tags,
-				meta.Description,
-			}
-		} else {
-			fields = []string{meta.Key}
+		fields := []string{meta.Key}
+		if opts.WithType {
+			fields = append(fields, meta.Type)
 		}
+		if opts.WithTags {
+			fields = append(fields, plainTagList(meta.Tags))
+		}
+		if opts.WithDates {
+			created := meta.Created.UTC().Format(time.DateOnly)
+			modified := ""
+			if !meta.Modified.Equal(meta.Created) {
+				modified = meta.Modified.UTC().Format(time.DateOnly)
+			}
+			fields = append(fields, created, modified)
+		}
+		if opts.WithDesc {
+			fields = append(fields, meta.Description)
+		}
+
 		if _, err := fmt.Fprintln(w, strings.Join(fields, delimiter)); err != nil {
 			return err
 		}
@@ -164,34 +154,160 @@ func renderPlain(w io.Writer, entries []model.Metadata, verbose bool, delimiter 
 	return nil
 }
 
-func renderPretty(w io.Writer, entries []model.Metadata, verbose bool) error {
-	tw := tabwriter.NewWriter(w, 2, 4, 2, ' ', 0)
-	if verbose {
-		fmt.Fprintln(tw, "KEY\tCREATED\tMODIFIED\tTAGS\tDESCRIPTION")
-	} else {
-		fmt.Fprintln(tw, "KEY\tTAGS")
-	}
+func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOptions) error {
+	styles := ui.DefaultStyles()
 
-	for _, meta := range entries {
-		if verbose {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-				meta.Key,
-				meta.Created.UTC().Format(time.RFC3339),
-				meta.Modified.UTC().Format(time.RFC3339),
-				meta.Tags,
-				meta.Description,
-			)
-		} else {
-			fmt.Fprintf(tw, "%s\t%s\n", meta.Key, meta.Tags)
-		}
-	}
-
-	if err := tw.Flush(); err != nil {
+	if len(entries) == 0 {
+		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
 		return err
 	}
 
-	if len(entries) == 0 {
-		fmt.Fprintln(w, "(no snippets)")
+	screenWidth := writerWidth(w)
+	if screenWidth <= 0 {
+		screenWidth = 80
+	}
+	contentWidth := max(screenWidth-4, 40)
+
+	for _, meta := range entries {
+		if _, err := fmt.Fprintln(w, renderStyledEntry(meta, contentWidth, styles, opts)); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func buildKeyLine(meta model.Metadata, styles ui.Styles, opts listViewOptions) string {
+	if opts.WithType {
+		icon := strings.TrimSpace(meta.TypeIcon())
+		if icon != "" {
+			return fmt.Sprintf("%s %s",
+				styles.Icon.Render(icon),
+				styles.Key.Render(meta.Key),
+			)
+		}
+	}
+	return styles.Key.Render(meta.Key)
+}
+
+func buildRootLine(meta model.Metadata, styles ui.Styles, wrap lipgloss.Style, opts listViewOptions) string {
+	base := buildKeyLine(meta, styles, opts)
+	if opts.WithTags {
+		if tags := styledTagList(meta.Tags, styles); tags != "" {
+			base = fmt.Sprintf("%s  %s", base, tags)
+		}
+	}
+	return wrap.Render(base)
+}
+
+func writerWidth(w io.Writer) int {
+	type fdWriter interface {
+		io.Writer
+		Fd() uintptr
+	}
+	if f, ok := w.(fdWriter); ok {
+		if wd, _, err := term.GetSize(int(f.Fd())); err == nil && wd > 0 {
+			return wd
+		}
+	}
+	return 0
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func renderStyledEntry(meta model.Metadata, width int, styles ui.Styles, opts listViewOptions) string {
+	rootWidth := max(width, 40)
+	childWidth := max(width-4, 20)
+
+	rootWrap := lipgloss.NewStyle().
+		Width(rootWidth).
+		MaxWidth(rootWidth)
+	childWrap := lipgloss.NewStyle().
+		Width(childWidth).
+		MaxWidth(childWidth)
+
+	rootLine := buildRootLine(meta, styles, rootWrap, opts)
+
+	t := tree.Root(rootLine).
+		Enumerator(compactEnumerator).
+		EnumeratorStyle(styles.Subtle).
+		Indenter(compactIndenter).
+		RootStyle(lipgloss.NewStyle()).
+		ItemStyle(lipgloss.NewStyle())
+
+	if opts.WithDates {
+		if dateLine := buildDateLine(meta, styles); dateLine != "" {
+			t.Child(childWrap.Render(dateLine))
+		}
+	}
+
+	if opts.WithDesc {
+		if desc := strings.TrimSpace(meta.Description); desc != "" {
+			t.Child(childWrap.Render(styles.Subtle.Render(desc)))
+		}
+	}
+
+	return t.String()
+}
+
+func buildDateLine(meta model.Metadata, styles ui.Styles) string {
+	created := styles.Subtle.Render(meta.Created.UTC().Format(time.DateOnly))
+	components := []string{
+		fmt.Sprintf("%s %s", styles.Label.Render("created"), created),
+	}
+	if !meta.Modified.Equal(meta.Created) {
+		modified := styles.Subtle.Render(meta.Modified.UTC().Format(time.DateOnly))
+		components = append(components, fmt.Sprintf("%s %s", styles.Label.Render("last updated"), modified))
+	}
+	return strings.Join(components, "  ")
+}
+
+func styledTagList(raw string, styles ui.Styles) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	split := strings.Split(raw, ",")
+	formatted := make([]string, 0, len(split))
+	for _, part := range split {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		formatted = append(formatted, styles.Tag.Render("@"+part))
+	}
+	return strings.Join(formatted, " ")
+}
+
+func plainTagList(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	parts := strings.Split(raw, ",")
+	formatted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		formatted = append(formatted, "@"+part)
+	}
+	return strings.Join(formatted, " ")
+}
+
+func compactEnumerator(children tree.Children, index int) string {
+	if children.Length()-1 == index {
+		return "└─"
+	}
+	return "├─"
+}
+
+func compactIndenter(children tree.Children, index int) string {
+	if children.Length()-1 == index {
+		return "  "
+	}
+	return "│ "
 }

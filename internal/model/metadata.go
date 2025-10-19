@@ -11,3 +11,12 @@ type Metadata struct {
 	Description string
 	Tags        string
 }
+
+func (m *Metadata) TypeIcon() string {
+	switch m.Type {
+	case "url":
+		return "url"
+	default:
+		return "txt"
+	}
+}
