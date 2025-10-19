@@ -115,27 +115,26 @@ func stdinHasData() (bool, error) {
 }
 
 func printUsage() {
+
 	fmt.Fprintf(os.Stdout, `Usage:
-  wow [key] [--tag string] [--untag string] [@tag] [-@tag]    	Retrieve snippet when no stdin data
-  wow <key> [--tag string] [@tag] [--desc string] < file      	Save snippet with explicit key
-  wow [--tag string] [@tag] [--desc string] < file            	Save snippet with auto-generated key
-  wow save <key> [--tag string] [@tag] [--desc string] < file	Explicit save
-  wow get <key> [--tag string] [--untag string] [@tag] [-@tag]	Explicit get
-  wow open <key> [--pager]                                    	Open snippet or view in pager
-  wow edit <key>                                              	Edit snippet in $WOW_EDITOR or $EDITOR
-  wow list [--plain] [--with-tags] [--with-type] [--with-desc]	List saved snippets (alias: ls)
-           [--with-dates] [--all/--verbose]                   
-  wow remove <key>                                            	Remove snippet (alias: rm)
+  wow get    <key> [--tag str] [--untag str] [@tag] [-@tag]  Get a snippet.
+  wow save   <key> [--tag str] [--desc str] [@tag]           Save a snippet.
+  wow open   <key> [--pager]                                 Open a snippet. 
+  wow edit   <key>                                           Edit a snippet.
+  wow remove <key>                                           Remove a snippet.
+  wow list [--limit int] [--page int] [--plain] [--verbose]  List snippets. 
+           [--tags] [--type] [--desc] [--dates] [--all]
+  wow help [command]                                         Get specific help.
+  
+  Run any command with --help for more info.
 
-  Run any command with --help for more info on that specific command.
+  Many flags support being written in shorthand, by using one dash
+  and (usually) the first letter of the flag name. Shorthand flags
+  can be combined by writing the letters together in any order. If
+  a flag takes a value, it needs to be written last — you can only
+  pass in one argument per command, so if you need to specify more,
+  just write your flags separately.
 
-  Many flags support being written in shorthand, usually by using one
-  dash and the first letter of the flag name. For example, --help can
-  be called with -h. Combining multiple shorthand flags is also easy,
-  by just writing all the letters in one, in any order you like.
-
-  For example, "wow list" can be made --plain and --verbose with -vp.
-
-  You can see which flags support shorthands with "wow [command] -h".
+  For example: "wow list -tdl 2" is --tags, --desc, and --limit 2.
 `)
 }

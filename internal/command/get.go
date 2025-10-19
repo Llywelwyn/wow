@@ -71,7 +71,7 @@ func (c *GetCommand) Execute(args []string) error {
 			fmt.Fprintln(c.Output, `Usage:
   wow get <key> [--tag tag1,tag2] [--untag tag1] [@tag1 @tag2] [-@tag1]
 
-  Wow! Fetches a snippet, or modifies its metadata.
+  wow! Fetches a snippet, or modifies its metadata.
 
   You can get implicitly by running "wow <key>"
   without the "get" keyword. Provided no input
@@ -105,7 +105,7 @@ func (c *GetCommand) Execute(args []string) error {
 		fmt.Fprintln(c.Output, `Usage:
   wow get <key> [--tag tag1,tag2] [--untag tag1] [@tag1 @tag2] [-@tag1]
 
-  Wow! Fetches a snippet, or modifies its metadata.
+  wow! Fetches a snippet, or modifies its metadata.
 
   You can get implicitly by running "wow <key>"
   without the "get" keyword. Provided no input
