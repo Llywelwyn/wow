@@ -145,11 +145,7 @@ func (c *ListCommand) Execute(args []string) error {
 			}
 		}
 	} else {
-		if opts.TotalItems == 0 {
-			opts.TotalPages = 1
-		} else {
-			opts.TotalPages = 1
-		}
+		opts.TotalPages = 1
 		opts.Page = 1
 	}
 	entries = paginateEntries(entries, opts.Limit, opts.Page)
@@ -203,16 +199,61 @@ func renderPlainList(w io.Writer, entries []model.Metadata, opts listViewOptions
 	return nil
 }
 
+func makeFlagsString(opts listViewOptions) string {
+	if opts.WithDates && opts.WithDesc && opts.WithTags && opts.WithType {
+		return "viewing all metadata"
+	}
+
+	var flags []string
+	if opts.WithTags {
+		flags = append(flags, "tags")
+	}
+	if opts.WithType {
+		flags = append(flags, "type")
+	}
+	if opts.WithDates {
+		flags = append(flags, "dates")
+	}
+	if opts.WithDesc {
+		flags = append(flags, "descriptions")
+	}
+
+	if len(flags) == 0 {
+		return "viewing only names"
+	}
+
+	var flagstr string
+	switch len(flags) {
+	case 1:
+		flagstr = flags[0]
+	case 2:
+		flagstr = flags[0] + " and " + flags[1]
+	default:
+		flagstr = strings.Join(flags[:len(flags)-1], ", ") + ", and " + flags[len(flags)-1]
+	}
+
+	return "viewing " + flagstr
+}
+
 func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOptions) error {
 	styles := ui.DefaultStyles()
 
-	if opts.Limit > 0 && opts.TotalPages > 0 {
-		header := fmt.Sprintf("Page %d of %d", opts.Page, opts.TotalPages)
-		fmt.Fprintln(w, styles.Subtle.Render(header))
-		if len(entries) > 0 {
-			fmt.Fprintln(w)
-		}
+	firstEntryNum := opts.Limit*(opts.Page-1) + 1
+	lastEntryNum := opts.Limit * opts.Page
+	if lastEntryNum > opts.TotalItems {
+		lastEntryNum = opts.TotalItems
 	}
+	header := fmt.Sprintf("Page %d of %d (showing %d to %d out of %d total)",
+		opts.Page,
+		opts.TotalPages,
+		firstEntryNum,
+		lastEntryNum,
+		opts.TotalItems)
+	fmt.Fprintln(w, styles.Subtle.Render(header))
+	if flagstr := makeFlagsString(opts); flagstr != "" {
+		fmt.Fprintln(w, styles.Secondary.Render(flagstr))
+	}
+	fmt.Fprintln(w)
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
