@@ -95,7 +95,7 @@ func (c *ListCommand) Execute(args []string) error {
 
   Use --plain for tabular output to make writing scripts to
   parse lists easier. You can replace tabs with a different
-  delimter by passing any string as an argument.`)
+  delimiter by passing any string as an argument.`)
 		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
 		return nil
