@@ -26,12 +26,14 @@ type ListCommand struct {
 }
 
 type listViewOptions struct {
-	WithTags  bool
-	WithDates bool
-	WithDesc  bool
-	WithType  bool
-	Limit     int
-	Page      int
+	WithTags   bool
+	WithDates  bool
+	WithDesc   bool
+	WithType   bool
+	Limit      int
+	Page       int
+	TotalItems int
+	TotalPages int
 }
 
 // NewListCommand constructs a ListCommand using defaults from cfg.
@@ -128,6 +130,28 @@ func (c *ListCommand) Execute(args []string) error {
 		Page:      *page,
 	}
 
+	opts.TotalItems = len(entries)
+	if opts.Limit > 0 {
+		if opts.TotalItems == 0 {
+			opts.TotalPages = 1
+			opts.Page = 1
+		} else {
+			opts.TotalPages = (opts.TotalItems + opts.Limit - 1) / opts.Limit
+			if opts.Page > opts.TotalPages {
+				opts.Page = opts.TotalPages
+			}
+			if opts.Page < 1 {
+				opts.Page = 1
+			}
+		}
+	} else {
+		if opts.TotalItems == 0 {
+			opts.TotalPages = 1
+		} else {
+			opts.TotalPages = 1
+		}
+		opts.Page = 1
+	}
 	entries = paginateEntries(entries, opts.Limit, opts.Page)
 
 	if *plain != "" || !writerIsTerminal(c.Output) {
@@ -181,6 +205,14 @@ func renderPlainList(w io.Writer, entries []model.Metadata, opts listViewOptions
 
 func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOptions) error {
 	styles := ui.DefaultStyles()
+
+	if opts.Limit > 0 && opts.TotalPages > 0 {
+		header := fmt.Sprintf("Page %d of %d", opts.Page, opts.TotalPages)
+		fmt.Fprintln(w, styles.Subtle.Render(header))
+		if len(entries) > 0 {
+			fmt.Fprintln(w)
+		}
+	}
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
