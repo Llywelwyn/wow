@@ -240,16 +240,13 @@ func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOption
 
 	firstEntryNum := opts.Limit*(opts.Page-1) + 1
 	lastEntryNum := min(opts.Limit*opts.Page, opts.TotalItems)
-	header := fmt.Sprintf("Page %d of %d (showing %d to %d out of %d total)",
+	header := fmt.Sprintf("Page %d of %d (%d—%d/%d)",
 		opts.Page,
 		opts.TotalPages,
 		firstEntryNum,
 		lastEntryNum,
 		opts.TotalItems)
-	fmt.Fprintln(w, styles.Subtle.Render(header))
-	if flagstr := makeFlagsString(opts); flagstr != "" {
-		fmt.Fprintln(w, styles.Secondary.Render(flagstr))
-	}
+	fmt.Fprintln(w, styles.Subtle.Render(header), styles.Secondary.Render(makeFlagsString(opts)))
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
