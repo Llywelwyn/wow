@@ -239,10 +239,7 @@ func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOption
 	styles := ui.DefaultStyles()
 
 	firstEntryNum := opts.Limit*(opts.Page-1) + 1
-	lastEntryNum := opts.Limit * opts.Page
-	if lastEntryNum > opts.TotalItems {
-		lastEntryNum = opts.TotalItems
-	}
+	lastEntryNum := min(opts.Limit*opts.Page, opts.TotalItems)
 	header := fmt.Sprintf("Page %d of %d (showing %d to %d out of %d total)",
 		opts.Page,
 		opts.TotalPages,
