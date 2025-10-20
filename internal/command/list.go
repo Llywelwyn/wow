@@ -250,7 +250,6 @@ func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOption
 	if flagstr := makeFlagsString(opts); flagstr != "" {
 		fmt.Fprintln(w, styles.Secondary.Render(flagstr))
 	}
-	fmt.Fprintln(w)
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
