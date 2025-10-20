@@ -47,6 +47,7 @@ func (c *SaveCommand) Execute(args []string) error {
 
 	fs := flag.NewFlagSet("save", flag.ContinueOnError)
 	fs.SetOutput(c.Output)
+	var tee *bool = fs.BoolP("tee", "T", false, "print stdin back out, rather than the key")
 	var desc *string = fs.StringP("desc", "d", "", "description")
 	var tags *string = fs.StringP("tag", "t", "", "comma-separated tags, e.g. one,two")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
@@ -80,7 +81,11 @@ func (c *SaveCommand) Execute(args []string) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintln(c.Output, res.Key); err != nil {
+	output := res.Key
+	if *tee {
+		output = string(res.Contents[:])
+	}
+	if _, err := fmt.Fprintln(c.Output, output); err != nil {
 		return fmt.Errorf("write key to output: %w", err)
 	}
 	return nil

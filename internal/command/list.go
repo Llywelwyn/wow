@@ -26,10 +26,14 @@ type ListCommand struct {
 }
 
 type listViewOptions struct {
-	WithTags  bool
-	WithDates bool
-	WithDesc  bool
-	WithType  bool
+	WithTags   bool
+	WithDates  bool
+	WithDesc   bool
+	WithType   bool
+	Limit      int
+	Page       int
+	TotalItems int
+	TotalPages int
 }
 
 // NewListCommand constructs a ListCommand using defaults from cfg.
@@ -53,14 +57,16 @@ func (c *ListCommand) Execute(args []string) error {
 
 	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
 	fs.SetOutput(c.Output)
-	var plain *string = fs.StringP("plain", "p", "", "removes pretty formatting; pass a string to override tab-delimiter")
+	var plain *string = fs.String("plain", "", "removes pretty formatting; pass a string to override tab-delimiter")
 	fs.Lookup("plain").NoOptDefVal = "\t"
-	var withTags *bool = fs.BoolP("with-tags", "t", false, "include tags")
-	var withDates *bool = fs.BoolP("with-dates", "D", false, "include created/updated dates")
-	var withDesc *bool = fs.BoolP("with-desc", "d", false, "include descriptions")
-	var withType *bool = fs.BoolP("with-type", "T", false, "include snippet type")
-	var all *bool = fs.BoolP("all", "a", false, "include all metadata (tags, type, dates, description)")
-	var verbose *bool = fs.BoolP("verbose", "v", false, "alias for --all")
+	var withTags *bool = fs.BoolP("tags", "t", false, "include tags")
+	var withDates *bool = fs.BoolP("dates", "D", false, "include created/updated dates")
+	var withDesc *bool = fs.BoolP("desc", "d", false, "include descriptions")
+	var withType *bool = fs.BoolP("type", "T", false, "include snippet type")
+	var all *bool = fs.BoolP("all", "a", false, "overrides --limit and any defaults, showing every listing")
+	var verbose *bool = fs.BoolP("verbose", "v", false, "show all metadata fields")
+	var limit *int = fs.IntP("limit", "l", 50, "maximum number of snippets to display per page")
+	var page *int = fs.IntP("page", "p", 1, "page number (1-based)")
 	var help *bool = fs.BoolP("help", "h", false, "display help")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -68,27 +74,41 @@ func (c *ListCommand) Execute(args []string) error {
 
 	if *help {
 		fmt.Fprintln(c.Output, `Usage:
-  wow list [--plain[=delimiter]] [--with-tags] [--with-type]
-          [--with-desc] [--with-dates] [--all/--verbose]
+  wow list [--limit int] [--page int] [--plain] [--verbose]
+           [--tags] [--type] [--desc] [--dates] [--all]
 
-  Wow! Lists metadata for all the snippets you've got saved.
+  wow! Lists metadata for all the snippets you've got saved.
+  It's modular, with support for pagination, and tabular or
+  prettified output.
 
-  List output is totally modular and can be adjusted with flags so
-  only what you care about gets displayed. Running "wow list" with
-  no flags shows a simple list of snippet keys.
+  By default there's a limit of 50 listings per page.
+     --page lets you view different pages.
+     --all removes this limit entirely.
+     --limit lets you change it for this query.
 
-  You can add fields one-by-one with flags or call list with --all
-  to see all available information about each entry.
+  Use --limit and --page for pagination. If you've got 1000
+  listings, --limit 5 will split into 200 pages of 5.
 
-  Importantly: the view you see when you run "wow list" is pretty.
-  Whenever you pipe the output somewhere else, the --plain flag is
-  forcibly enabled to make parsing the data easier.
+  Without any extra flags, it displays a list of saved keys
+  only. With --verbose or -v, all metadata fields are shown.
+  Individual flags can be used for more granular control.
 
-  --plain output is tab-delimited by default, but the flag accepts
-  any string as an override if you prefer a different format.`)
+  Use --plain for tabular output to make writing scripts to
+  parse lists easier. You can replace tabs with a different
+  delimiter by passing any string as an argument.`)
 		fmt.Fprintln(c.Output)
 		fs.PrintDefaults()
 		return nil
+	}
+
+	if *limit < 0 {
+		return errors.New("limit must be >= 0")
+	}
+	if *page < 1 {
+		return errors.New("page must be >= 1")
+	}
+	if *limit == 0 {
+		*page = 1
 	}
 
 	ctx := context.Background()
@@ -97,13 +117,38 @@ func (c *ListCommand) Execute(args []string) error {
 		return err
 	}
 
-	useAll := *all || *verbose
-	opts := listViewOptions{
-		WithTags:  *withTags || useAll,
-		WithDates: *withDates || useAll,
-		WithDesc:  *withDesc || useAll,
-		WithType:  *withType || useAll,
+	actualLimit := *limit
+	if *all {
+		actualLimit = 0
 	}
+	opts := listViewOptions{
+		WithTags:  *withTags || *verbose,
+		WithDates: *withDates || *verbose,
+		WithDesc:  *withDesc || *verbose,
+		WithType:  *withType || *verbose,
+		Limit:     actualLimit,
+		Page:      *page,
+	}
+
+	opts.TotalItems = len(entries)
+	if opts.Limit > 0 {
+		if opts.TotalItems == 0 {
+			opts.TotalPages = 1
+			opts.Page = 1
+		} else {
+			opts.TotalPages = (opts.TotalItems + opts.Limit - 1) / opts.Limit
+			if opts.Page > opts.TotalPages {
+				opts.Page = opts.TotalPages
+			}
+			if opts.Page < 1 {
+				opts.Page = 1
+			}
+		}
+	} else {
+		opts.TotalPages = 1
+		opts.Page = 1
+	}
+	entries = paginateEntries(entries, opts.Limit, opts.Page)
 
 	if *plain != "" || !writerIsTerminal(c.Output) {
 		delimiter := *plain
@@ -154,8 +199,58 @@ func renderPlainList(w io.Writer, entries []model.Metadata, opts listViewOptions
 	return nil
 }
 
+func makeFlagsString(opts listViewOptions) string {
+	if opts.WithDates && opts.WithDesc && opts.WithTags && opts.WithType {
+		return "viewing all metadata"
+	}
+
+	var flags []string
+	if opts.WithTags {
+		flags = append(flags, "tags")
+	}
+	if opts.WithType {
+		flags = append(flags, "type")
+	}
+	if opts.WithDates {
+		flags = append(flags, "dates")
+	}
+	if opts.WithDesc {
+		flags = append(flags, "descriptions")
+	}
+
+	if len(flags) == 0 {
+		return "viewing only names"
+	}
+
+	var flagstr string
+	switch len(flags) {
+	case 1:
+		flagstr = flags[0]
+	case 2:
+		flagstr = flags[0] + " and " + flags[1]
+	default:
+		flagstr = strings.Join(flags[:len(flags)-1], ", ") + ", and " + flags[len(flags)-1]
+	}
+
+	return "viewing " + flagstr
+}
+
 func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOptions) error {
 	styles := ui.DefaultStyles()
+
+	firstEntryNum := opts.Limit*(opts.Page-1) + 1
+	lastEntryNum := min(opts.Limit*opts.Page, opts.TotalItems)
+	header := fmt.Sprintf("Page %d of %d (showing %d to %d out of %d total)",
+		opts.Page,
+		opts.TotalPages,
+		firstEntryNum,
+		lastEntryNum,
+		opts.TotalItems)
+	fmt.Fprintln(w, styles.Subtle.Render(header))
+	if flagstr := makeFlagsString(opts); flagstr != "" {
+		fmt.Fprintln(w, styles.Secondary.Render(flagstr))
+	}
+	fmt.Fprintln(w)
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
@@ -264,6 +359,24 @@ func buildDateLine(meta model.Metadata, styles ui.Styles) string {
 		components = append(components, fmt.Sprintf("%s %s", styles.Label.Render("last updated"), modified))
 	}
 	return strings.Join(components, "  ")
+}
+
+func paginateEntries(entries []model.Metadata, limit, page int) []model.Metadata {
+	if limit <= 0 || len(entries) == 0 {
+		return entries
+	}
+	if page < 1 {
+		page = 1
+	}
+	start := (page - 1) * limit
+	if start >= len(entries) {
+		return entries[:0]
+	}
+	end := start + limit
+	if end > len(entries) {
+		end = len(entries)
+	}
+	return entries[start:end]
 }
 
 func styledTagList(raw string, styles ui.Styles) string {
