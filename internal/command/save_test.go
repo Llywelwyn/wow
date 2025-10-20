@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
@@ -22,16 +21,12 @@ func newTestSaveCommand(t *testing.T) (*SaveCommand, func()) {
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &services.Saver{
+	cmd := &SaveCommand{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {
 			return time.Unix(1_700_000_000, 0)
 		},
-	}
-
-	cmd := &SaveCommand{
-		Saver: saver,
 		// Input and Output assigned per test.
 	}
 
@@ -94,7 +89,7 @@ func TestSaveCommandTagsFlag(t *testing.T) {
 		t.Fatalf("output key = %q, want auto/1700000000", got)
 	}
 
-	meta, err := storage.GetMetadata(context.Background(), cmd.Saver.DB, got)
+	meta, err := storage.GetMetadata(context.Background(), cmd.DB, got)
 	if err != nil {
 		t.Fatalf("GetMetadata error = %v", err)
 	}
@@ -115,7 +110,7 @@ func TestSaveCommandImplicitTags(t *testing.T) {
 		t.Fatalf("Execute error = %v", err)
 	}
 
-	meta, err := storage.GetMetadata(context.Background(), cmd.Saver.DB, "go/foo")
+	meta, err := storage.GetMetadata(context.Background(), cmd.DB, "go/foo")
 	if err != nil {
 		t.Fatalf("GetMetadata error = %v", err)
 	}

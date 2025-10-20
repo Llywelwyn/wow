@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
-func setupGetTest(t *testing.T) (Config, *services.Saver, func()) {
+func setupGetTest(t *testing.T) (Config, *SaveCommand, func()) {
 	t.Helper()
 
 	base := t.TempDir()
@@ -22,7 +21,7 @@ func setupGetTest(t *testing.T) (Config, *services.Saver, func()) {
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &services.Saver{
+	saveCmd := &SaveCommand{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {
@@ -39,18 +38,15 @@ func setupGetTest(t *testing.T) (Config, *services.Saver, func()) {
 	}
 
 	cleanup := func() { _ = db.Close() }
-	return cfg, saver, cleanup
+	return cfg, saveCmd, cleanup
 }
 
 func TestGetCommandReadsSnippet(t *testing.T) {
-	cfg, saver, cleanup := setupGetTest(t)
+	cfg, saveCmd, cleanup := setupGetTest(t)
 	defer cleanup()
 
-	saveCmd := &SaveCommand{
-		Saver:  saver,
-		Input:  strings.NewReader("hello world"),
-		Output: bytes.NewBuffer(nil),
-	}
+	saveCmd.Input = strings.NewReader("hello world")
+	saveCmd.Output = bytes.NewBuffer(nil)
 	if err := saveCmd.Execute([]string{"go/foo"}); err != nil {
 		t.Fatalf("Save Execute error = %v", err)
 	}
@@ -69,14 +65,11 @@ func TestGetCommandReadsSnippet(t *testing.T) {
 }
 
 func TestGetCommandImplicitAddTag(t *testing.T) {
-	cfg, saver, cleanup := setupGetTest(t)
+	cfg, saveCmd, cleanup := setupGetTest(t)
 	defer cleanup()
 
-	saveCmd := &SaveCommand{
-		Saver:  saver,
-		Input:  strings.NewReader("content"),
-		Output: bytes.NewBuffer(nil),
-	}
+	saveCmd.Input = strings.NewReader("content")
+	saveCmd.Output = bytes.NewBuffer(nil)
 	if err := saveCmd.Execute([]string{"go/foo"}); err != nil {
 		t.Fatalf("Save Execute error = %v", err)
 	}
@@ -103,14 +96,11 @@ func TestGetCommandImplicitAddTag(t *testing.T) {
 }
 
 func TestGetCommandRemoveTag(t *testing.T) {
-	cfg, saver, cleanup := setupGetTest(t)
+	cfg, saveCmd, cleanup := setupGetTest(t)
 	defer cleanup()
 
-	saveCmd := &SaveCommand{
-		Saver:  saver,
-		Input:  strings.NewReader("content"),
-		Output: bytes.NewBuffer(nil),
-	}
+	saveCmd.Input = strings.NewReader("content")
+	saveCmd.Output = bytes.NewBuffer(nil)
 	if err := saveCmd.Execute([]string{"go/foo", "@foo"}); err != nil {
 		t.Fatalf("Save Execute error = %v", err)
 	}
@@ -137,14 +127,11 @@ func TestGetCommandRemoveTag(t *testing.T) {
 }
 
 func TestGetCommandFlagTagging(t *testing.T) {
-	cfg, saver, cleanup := setupGetTest(t)
+	cfg, saveCmd, cleanup := setupGetTest(t)
 	defer cleanup()
 
-	saveCmd := &SaveCommand{
-		Saver:  saver,
-		Input:  strings.NewReader("content"),
-		Output: bytes.NewBuffer(nil),
-	}
+	saveCmd.Input = strings.NewReader("content")
+	saveCmd.Output = bytes.NewBuffer(nil)
 	if err := saveCmd.Execute([]string{"go/foo", "@foo"}); err != nil {
 		t.Fatalf("Save Execute error = %v", err)
 	}
@@ -172,14 +159,11 @@ func TestGetCommandFlagTagging(t *testing.T) {
 }
 
 func TestGetCommandTagUnchanged(t *testing.T) {
-	cfg, saver, cleanup := setupGetTest(t)
+	cfg, saveCmd, cleanup := setupGetTest(t)
 	defer cleanup()
 
-	saveCmd := &SaveCommand{
-		Saver:  saver,
-		Input:  strings.NewReader("content"),
-		Output: bytes.NewBuffer(nil),
-	}
+	saveCmd.Input = strings.NewReader("content")
+	saveCmd.Output = bytes.NewBuffer(nil)
 	if err := saveCmd.Execute([]string{"go/foo", "@foo"}); err != nil {
 		t.Fatalf("Save Execute error = %v", err)
 	}

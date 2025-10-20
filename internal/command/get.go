@@ -2,15 +2,16 @@ package command
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	flag "github.com/spf13/pflag"
 
 	"github.com/llywelwyn/wow/internal/key"
-	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 	"github.com/llywelwyn/wow/internal/ui"
 )
@@ -18,23 +19,18 @@ import (
 // GetCommand streams snippet content to stdout and optionally mutates tags.
 type GetCommand struct {
 	BaseDir string
+	DB      *sql.DB
 	Output  io.Writer
-	Meta    *services.Metadata
+	Now     func() time.Time
 }
 
 // NewGetCommand constructs a GetCommand using defaults from cfg.
 func NewGetCommand(cfg Config) *GetCommand {
-	var meta *services.Metadata
-	if cfg.DB != nil {
-		meta = &services.Metadata{
-			DB:  cfg.DB,
-			Now: cfg.clock(),
-		}
-	}
 	return &GetCommand{
 		BaseDir: cfg.BaseDir,
+		DB:      cfg.DB,
 		Output:  cfg.writer(),
-		Meta:    meta,
+		Now:     cfg.clock(),
 	}
 }
 
@@ -149,16 +145,16 @@ func (c *GetCommand) Execute(args []string) error {
 		return nil
 	}
 
-	if c.Meta == nil {
+	if c.DB == nil || c.Now == nil {
 		return errors.New("metadata updates not supported")
 	}
 
-	result, err := c.Meta.UpdateTags(context.Background(), keyArg, addTags, removeTags)
+	added, removed, err := c.updateTags(context.Background(), keyArg, addTags, removeTags)
 	if err != nil {
 		return err
 	}
 
-	return writeTagSummary(c.Output, result.Added, result.Removed)
+	return writeTagSummary(c.Output, added, removed)
 }
 
 func writeTagSummary(w io.Writer, added, removed []string) error {
@@ -196,4 +192,37 @@ func formatTagList(tags []string) string {
 		formatted = append(formatted, styles.Tag.Render("@"+tag))
 	}
 	return strings.Join(formatted, " ")
+}
+
+func (c *GetCommand) updateTags(ctx context.Context, rawKey string, add, remove []string) ([]string, []string, error) {
+	if c.DB == nil || c.Now == nil {
+		return nil, nil, errors.New("metadata updates not supported")
+	}
+
+	normalized, err := key.Normalize(rawKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meta, err := storage.GetMetadata(ctx, c.DB, normalized)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	before := parseTags(meta.Tags)
+	updated := mergeTags(meta.Tags, add, remove)
+	after := parseTags(updated)
+
+	added := diffTags(after, before)
+	removed := diffTags(before, after)
+
+	if updated != meta.Tags {
+		meta.Tags = updated
+		meta.Modified = c.Now().UTC()
+		if err := storage.UpdateMetadata(ctx, c.DB, meta); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return added, removed, nil
 }

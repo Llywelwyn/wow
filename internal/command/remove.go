@@ -2,27 +2,29 @@ package command
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	flag "github.com/spf13/pflag"
 
-	"github.com/llywelwyn/wow/internal/services"
+	"github.com/llywelwyn/wow/internal/key"
+	"github.com/llywelwyn/wow/internal/storage"
 )
 
 // RemoveCommand deletes snippets identified by key.
 type RemoveCommand struct {
-	Remover *services.Remover
+	BaseDir string
+	DB      *sql.DB
 }
 
 // NewRemoveCommand constructs a RemoveCommand using defaults from cfg.
 func NewRemoveCommand(cfg Config) *RemoveCommand {
 	return &RemoveCommand{
-		Remover: &services.Remover{
-			BaseDir: cfg.BaseDir,
-			DB:      cfg.DB,
-		},
+		BaseDir: cfg.BaseDir,
+		DB:      cfg.DB,
 	}
 }
 
@@ -31,7 +33,7 @@ func (c *RemoveCommand) Name() string { return "remove" }
 
 // Execute deletes the provided snippet key.
 func (c *RemoveCommand) Execute(args []string) error {
-	if c.Remover == nil {
+	if c.DB == nil || strings.TrimSpace(c.BaseDir) == "" {
 		return errors.New("remove command not configured")
 	}
 
@@ -54,5 +56,31 @@ func (c *RemoveCommand) Execute(args []string) error {
 		return errors.New("key required")
 	}
 	key := remaining[0]
-	return c.Remover.Remove(context.Background(), key)
+	return c.removeSnippet(context.Background(), key)
+}
+
+func (c *RemoveCommand) removeSnippet(ctx context.Context, rawKey string) error {
+	if c.DB == nil {
+		return errors.New("remove command not configured")
+	}
+
+	normalized, err := key.Normalize(rawKey)
+	if err != nil {
+		return err
+	}
+
+	if err := storage.DeleteMetadata(ctx, c.DB, normalized); err != nil {
+		return err
+	}
+
+	path, err := key.ResolvePath(c.BaseDir, normalized)
+	if err != nil {
+		return err
+	}
+
+	if err := storage.Delete(path); err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return err
+	}
+
+	return nil
 }

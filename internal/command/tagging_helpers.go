@@ -3,9 +3,9 @@ package command
 import "strings"
 
 type tagArgs struct {
-    Add    []string
-    Remove []string
-    Others []string
+	Add    []string
+	Remove []string
+	Others []string
 }
 
 func extractTagArgs(args []string) tagArgs {
@@ -44,32 +44,32 @@ func parseAddTag(arg string) (string, bool) {
 }
 
 func parseRemoveTag(arg string) (string, bool) {
-    if len(arg) < 2 {
-        return "", false
-    }
-    if arg[0] == '-' && (arg[1] == '@' || arg[1] == '#') {
-        return strings.TrimSpace(arg[2:]), true
-    }
-    return "", false
+	if len(arg) < 2 {
+		return "", false
+	}
+	if arg[0] == '-' && (arg[1] == '@' || arg[1] == '#') {
+		return strings.TrimSpace(arg[2:]), true
+	}
+	return "", false
 }
 
 func splitTags(raw string) []string {
-    if strings.TrimSpace(raw) == "" {
-        return nil
-    }
-    parts := strings.Split(raw, ",")
-    var tags []string
-    seen := make(map[string]struct{})
-    for _, p := range parts {
-        tag := strings.TrimSpace(strings.ToLower(p))
-        if tag == "" {
-            continue
-        }
-        if _, ok := seen[tag]; ok {
-            continue
-        }
-        seen[tag] = struct{}{}
-        tags = append(tags, tag)
-    }
-    return tags
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	var tags []string
+	seen := make(map[string]struct{})
+	for _, p := range parts {
+		tag := normalizeTag(p)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		tags = append(tags, tag)
+	}
+	return tags
 }

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -8,11 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/services"
 	"github.com/llywelwyn/wow/internal/storage"
 )
 
-func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *services.Saver, func()) {
+func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *SaveCommand, func()) {
 	t.Helper()
 
 	base := t.TempDir()
@@ -22,7 +22,7 @@ func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *services.Saver, func())
 		t.Fatalf("InitMetaDB error = %v", err)
 	}
 
-	saver := &services.Saver{
+	saveCmd := &SaveCommand{
 		BaseDir: base,
 		DB:      db,
 		Now: func() time.Time {
@@ -30,38 +30,35 @@ func newRemoveCommandEnv(t *testing.T) (*RemoveCommand, *services.Saver, func())
 		},
 	}
 
-	remover := &services.Remover{
-		BaseDir: base,
-		DB:      db,
-	}
-
-	cmd := &RemoveCommand{Remover: remover}
+	cmd := &RemoveCommand{BaseDir: base, DB: db}
 
 	cleanup := func() {
 		_ = db.Close()
 	}
 
-	return cmd, saver, cleanup
+	return cmd, saveCmd, cleanup
 }
 
 func TestRemoveCommandDeletesSnippet(t *testing.T) {
-	cmd, saver, cleanup := newRemoveCommandEnv(t)
+	cmd, saveCmd, cleanup := newRemoveCommandEnv(t)
 	defer cleanup()
 
 	ctx := context.Background()
-	if _, err := saver.Save(ctx, services.SaveRequest{Key: "go/foo", Reader: strings.NewReader("content")}); err != nil {
-		t.Fatalf("Save error = %v", err)
+	saveCmd.Input = strings.NewReader("content")
+	saveCmd.Output = bytes.NewBuffer(nil)
+	if err := saveCmd.Execute([]string{"go/foo"}); err != nil {
+		t.Fatalf("Save Execute error = %v", err)
 	}
 
 	if err := cmd.Execute([]string{"go/foo"}); err != nil {
 		t.Fatalf("Execute error = %v", err)
 	}
 
-	if _, err := storage.GetMetadata(ctx, cmd.Remover.DB, "go/foo"); !errors.Is(err, storage.ErrMetadataNotFound) {
+	if _, err := storage.GetMetadata(ctx, cmd.DB, "go/foo"); !errors.Is(err, storage.ErrMetadataNotFound) {
 		t.Fatalf("expected ErrMetadataNotFound, got %v", err)
 	}
 
-	path := filepath.Join(cmd.Remover.BaseDir, "go", "foo")
+	path := filepath.Join(cmd.BaseDir, "go", "foo")
 	if exists, err := storage.Exists(path); err != nil {
 		t.Fatalf("Exists error = %v", err)
 	} else if exists {

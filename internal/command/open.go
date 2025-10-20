@@ -2,32 +2,38 @@ package command
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/llywelwyn/wow/internal/services"
 	flag "github.com/spf13/pflag"
+
+	"github.com/llywelwyn/wow/internal/key"
+	"github.com/llywelwyn/wow/internal/storage"
 )
 
-type openHandler interface {
-	Open(ctx context.Context, key string, opts services.OpenOptions) error
+// OpenOptions controls how a snippet should be opened.
+type OpenOptions struct {
+	UsePager bool
 }
 
 // OpenCommand launches snippets via configured opener or pager.
 type OpenCommand struct {
-	Opener openHandler
+	BaseDir   string
+	DB        *sql.DB
+	OpenFunc  func(context.Context, string) error
+	PagerFunc func(context.Context, string) error
 }
 
 // NewOpenCommand constructs an OpenCommand using defaults from cfg.
 func NewOpenCommand(cfg Config) *OpenCommand {
 	return &OpenCommand{
-		Opener: &services.Opener{
-			BaseDir:   cfg.BaseDir,
-			DB:        cfg.DB,
-			OpenFunc:  cfg.opener(),
-			PagerFunc: cfg.pager(),
-		},
+		BaseDir:   cfg.BaseDir,
+		DB:        cfg.DB,
+		OpenFunc:  cfg.opener(),
+		PagerFunc: cfg.pager(),
 	}
 }
 
@@ -36,7 +42,7 @@ func (c *OpenCommand) Name() string { return "open" }
 
 // Execute opens the snippet identified by key.
 func (c *OpenCommand) Execute(args []string) error {
-	if c.Opener == nil {
+	if c.DB == nil || c.OpenFunc == nil || c.PagerFunc == nil || strings.TrimSpace(c.BaseDir) == "" {
 		return errors.New("open command not configured")
 	}
 
@@ -61,5 +67,48 @@ func (c *OpenCommand) Execute(args []string) error {
 		return errors.New("open expects exactly one key")
 	}
 
-	return c.Opener.Open(context.Background(), remaining[0], services.OpenOptions{UsePager: *pager})
+	return c.openSnippet(context.Background(), remaining[0], OpenOptions{UsePager: *pager})
+}
+
+func (c *OpenCommand) openSnippet(ctx context.Context, rawKey string, opts OpenOptions) error {
+	if c.DB == nil || c.OpenFunc == nil || c.PagerFunc == nil {
+		return errors.New("open command not configured")
+	}
+
+	normalized, err := key.Normalize(rawKey)
+	if err != nil {
+		return err
+	}
+
+	meta, err := storage.GetMetadata(ctx, c.DB, normalized)
+	if err != nil {
+		return err
+	}
+
+	path, err := key.ResolvePath(c.BaseDir, normalized)
+	if err != nil {
+		return err
+	}
+
+	if opts.UsePager {
+		return c.PagerFunc(ctx, path)
+	}
+
+	if meta.Type == "url" {
+		data, err := storage.Read(path)
+		if err != nil {
+			return err
+		}
+		target := firstNonEmptyLine(data)
+		if target == "" {
+			target = string(data)
+		}
+		target = strings.TrimSpace(target)
+		if target == "" {
+			target = path
+		}
+		return c.OpenFunc(ctx, target)
+	}
+
+	return c.OpenFunc(ctx, path)
 }
