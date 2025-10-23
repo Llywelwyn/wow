@@ -5,18 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
 	"golang.org/x/term"
 
+	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/storage"
 	"github.com/llywelwyn/wow/internal/ui"
 )
 
 type ListCmd struct {
+	PreviewLines  int     `short:"n" default:"1" name:"Preview" help:"Number of lines to preview from snippets."`
 	Plain         bool    `help:"Format as a plain table of tab-separated values."`
 	Tags          bool    `short:"t" help:"Display tags."`
 	Date          bool    `short:"D" negatable:"" default:"true" help:"Display creation and last-modified dates."`
@@ -30,11 +35,48 @@ type ListCmd struct {
 	TotalPages    int     `kong:"-"`
 	TotalListings int     `kong:"-"`
 	Columns       Columns `kong:"-"`
+	BaseDir       string  `kong:"-"`
 }
 
 type Columns struct {
 	Column map[string]Column
 	Order  []string
+}
+
+func (c *Columns) SetWidths(list []model.Metadata) {
+	// Init with blank header lengths.
+	for name, col := range c.Column {
+		col.Width = len(col.Header)
+		c.Column[name] = col
+	}
+	// Get max widths from entries.
+	for _, entry := range list {
+		if c.Column["Date"].Shown {
+			col := c.Column["Date"]
+			col.Width = max(col.Width, len(entry.DateStr()))
+			c.Column["Date"] = col
+		}
+		if c.Column["Type"].Shown {
+			col := c.Column["Type"]
+			col.Width = max(col.Width, len(entry.TypeStr()))
+			c.Column["Type"] = col
+		}
+		if c.Column["Tags"].Shown {
+			col := c.Column["Tags"]
+			col.Width = max(col.Width, len(entry.TagsStr()))
+			c.Column["Tags"] = col
+		}
+		if c.Column["Name"].Shown {
+			col := c.Column["Name"]
+			col.Width = max(col.Width, len(entry.NameStr()))
+			c.Column["Name"] = col
+		}
+		if c.Column["Desc"].Shown {
+			col := c.Column["Desc"]
+			col.Width = max(col.Width, len(entry.DescStr()))
+			c.Column["Desc"] = col
+		}
+	}
 }
 
 type Column struct {
@@ -85,14 +127,17 @@ func (c *ListCmd) Run(kong *kong.Context, cfg Config) error {
 		Order: []string{"Date", "Type", "Name", "Tags", "Desc"},
 	}
 
+	c.BaseDir = cfg.BaseDir
+
 	ctx := context.Background()
 
 	listings, err := storage.ListMetadata(ctx, cfg.DB)
 	if err != nil {
 		return err
 	}
-
 	listings = c.paginate(listings)
+
+	c.Columns.SetWidths(listings)
 
 	c.print(cfg.Output, listings)
 
@@ -136,10 +181,10 @@ func (c *ListCmd) print(w io.Writer, listings []model.Metadata) error {
 	return err
 }
 
-func (c *ListCmd) buildHeader(style func(...string) string, delim string) ([]string, string, error) {
+func (c *ListCmd) buildHeader(style lipgloss.Style, delim string) ([]string, string, error) {
 	var cols []string
 	for _, name := range c.Columns.Order {
-		if col, exists := c.Columns.Column[name]; exists && col.Shown {
+		if col, exists := c.Columns.Column[name]; name != "Desc" && exists && col.Shown {
 			cols = append(cols, name)
 		}
 	}
@@ -147,13 +192,20 @@ func (c *ListCmd) buildHeader(style func(...string) string, delim string) ([]str
 	var headerString string
 	if c.Header {
 		var headers []string
+
+		var lastCol string
+		if len(cols) > 0 {
+			lastCol = cols[len(cols)-1]
+		}
+
 		for _, colName := range cols {
 			col := c.Columns.Column[colName]
-			val := col.Header
-			if style != nil {
-				val = style(val)
+			last := (colName == lastCol)
+
+			if !last {
+				style = style.Width(col.Width).AlignHorizontal(lipgloss.Left)
 			}
-			headers = append(headers, val)
+			headers = append(headers, style.Render(col.Header))
 		}
 		headerString = strings.Join(headers, delim)
 	}
@@ -161,7 +213,7 @@ func (c *ListCmd) buildHeader(style func(...string) string, delim string) ([]str
 }
 
 func (c *ListCmd) table(w io.Writer, listings []model.Metadata) error {
-	cols, headerString, err := c.buildHeader(nil, "\t")
+	cols, headerString, err := c.buildHeader(lipgloss.NewStyle(), "\t")
 	if err != nil {
 		return err
 	}
@@ -219,7 +271,7 @@ func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
 
 	// If we want headers, print them.
 	if c.Header {
-		cols, headerLine, err := c.buildHeader(styles.Underline.Render, " ")
+		cols, headerLine, err := c.buildHeader(styles.Underline, " ")
 		if err != nil {
 			return err
 		}
@@ -244,43 +296,83 @@ func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
 		if _, err := fmt.Fprintln(w, c.prettyListing(listing, width, styles)); err != nil {
 			return err
 		}
+		path, err := key.ResolvePath(c.BaseDir, listing.Key)
+		if err != nil {
+			return err
+		}
+		cmd := exec.Command("head", "-n", fmt.Sprint(c.PreviewLines), path)
+		cmd.Stdout = w
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to run head on %s: %w", listing.Key, err)
+		}
 	}
 
 	return nil
 }
 
-func (c *ListCmd) prettyListing(listing model.Metadata, width int, styles ui.Styles) string {
-	// Build our root entry depending on opts.
-	root := StringBuilder{styles.Key.Render(listing.Key)}.
-		Prefix(styles.Icon.Render(listing.TypeIcon()), c.Columns.Column["Type"].Shown && listing.TypeIcon() != "").
-		Prefix(styles.Muted.Render(listing.Modified.UTC().Format("02 Jan 15:04")), c.Columns.Column["Date"].Shown).
-		Suffix(styles.Tag.Render(listing.Tags), c.Columns.Column["Tags"].Shown && listing.Tags != "").
-		Build(" ")
-
-	// Pad to width, wrap if any larger.
-	wrapped := styles.Body.
-		Width(width).
-		MaxWidth(width).
-		Render(root)
-
-	t := tree.Root(wrapped).
-		Enumerator(c.enumerator).
-		EnumeratorStyle(styles.Muted).
-		Indenter(c.indenter).
-		RootStyle(styles.Body).
-		ItemStyle(styles.Body)
-
-	childWidth := max(1, width-4)
-	if c.Columns.Column["Desc"].Shown && listing.Description != "" {
-		desc := styles.Muted.
-			Width(childWidth).
-			MaxWidth(childWidth).
-			Render(listing.Description)
-
-		t.Child(desc)
+func (c *ListCmd) prettyListing(listing model.Metadata, maxWidth int, styles ui.Styles) string {
+	var lines []string
+	var root []string
+	var cols []string
+	for _, name := range c.Columns.Order {
+		if col, exists := c.Columns.Column[name]; exists && col.Shown {
+			cols = append(cols, name)
+		}
 	}
 
-	return t.String()
+	var lastRootCol string
+	for i := len(cols) - 1; i >= 0; i-- {
+		if cols[i] != "Desc" {
+			lastRootCol = cols[i]
+			break
+		}
+	}
+
+	for _, name := range cols {
+		if name == "Desc" {
+			continue
+		}
+
+		col := c.Columns.Column[name]
+		last := (name == lastRootCol)
+		val := listing.Formatted(name)
+		style := c.getColumnStyle(styles, name, col.Width, maxWidth, last)
+		root = append(root, style.Render(val))
+	}
+
+	spacer := styles.Body.Width(1).Render(" ")
+	var rootRender []string
+	for i, part := range root {
+		rootRender = append(rootRender, part)
+		if i < len(root)-1 {
+			rootRender = append(rootRender, spacer)
+		}
+	}
+	lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Left, rootRender...))
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (c *ListCmd) getColumnStyle(styles ui.Styles, name string, width, maxWidth int, last bool) lipgloss.Style {
+	var style lipgloss.Style
+	switch name {
+	case "Date":
+		style = styles.Body
+	case "Type":
+		style = styles.Primary
+	case "Name":
+		style = styles.Body
+	case "Tags":
+		style = styles.Tag
+	case "Desc":
+		style = styles.Muted
+	}
+	if !last {
+		style = style.Width(width)
+	} else if name == "Desc" {
+		style = style.MaxWidth(maxWidth)
+	}
+	return style
 }
 
 func (c *ListCmd) writerWidth(w io.Writer) int {
