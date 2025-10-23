@@ -29,7 +29,7 @@ var Wow struct {
 	Get    GetCmd            `cmd:"1" aliases:"g" help:"Get a snippet."`
 	Edit   command.EditCmd   `cmd:"1" aliases:"e" help:"Edit a snippet."`
 	Open   OpenCmd           `cmd:"1" aliases:"o" help:"Open a snippet."`
-	List   ListCmd           `cmd:"1" aliases:"l,ls" help:"List snippets."`
+	List   command.ListCmd   `cmd:"1" aliases:"l,ls" help:"List snippets."`
 	Remove command.RemoveCmd `cmd:"1" aliases:"r,rm" help:"Remove a snippet."`
 }
 
@@ -58,23 +58,6 @@ type OpenCmd struct {
 }
 
 func (c *OpenCmd) Run(ctx *kong.Context) error {
-	return nil
-}
-
-type ListCmd struct {
-	Plain   bool `help:"Format as a plain table of tab-separated values."`
-	Tags    bool `short:"t" help:"Display tags."`
-	Dates   bool `short:"D" help:"Display creation and last-modified dates."`
-	Desc    bool `short:"d" help:"Display description."`
-	Type    bool `short:"T" help:"Display type."`
-	Verbose bool `short:"v" help:"Display all metadata."`
-	Limit   int  `short:"l" default:"50" help:"Number of snippets per page."`
-	Page    int  `short:"p" default:"1" help:"Page number."`
-	All     bool `short:"a" help:"Disable pagination and display all snippets."`
-}
-
-func (c *ListCmd) Run(ctx *kong.Context, cfg command.Config) error {
-	fmt.Print("sjakdasdjasdkadskj")
 	return nil
 }
 
@@ -143,7 +126,6 @@ func root() error {
 	k.Run()
 	ctx.FatalIfErrorf(err)
 
-	command.NewListCommand(cmdCfg).Execute([]string{})
 	return nil
 }
 
@@ -179,12 +161,10 @@ func run() error {
 	saveCmd := command.NewSaveCommand(cmdCfg)
 	getCmd := command.NewGetCommand(cmdCfg)
 	openCmd := command.NewOpenCommand(cmdCfg)
-	listCmd := command.NewListCommand(cmdCfg)
 
 	dispatcher.Register(saveCmd, "s")
 	dispatcher.Register(getCmd, "g")
 	dispatcher.Register(openCmd, "o")
-	dispatcher.Register(listCmd, "ls")
 
 	// os.Args[0] is this script. Take the rest.
 	args := os.Args[1:]
