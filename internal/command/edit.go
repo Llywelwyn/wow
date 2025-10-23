@@ -44,19 +44,17 @@ func (c *EditCmd) Run(kong *kong.Context, cfg Config) error {
 		fmt.Println(err)
 	}
 
+	// If there were changes, update Modified time and re-detect type.
 	changed := after.ModTime() != before.ModTime() || after.Size() != before.Size()
 	if !changed {
 		return nil
 	}
-
 	data, err := storage.Read(path)
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	metadata.Type = detectSnippetType(data)
 	metadata.Modified = cfg.Clock().UTC()
-
 	if err := storage.UpdateMetadata(ctx, cfg.DB, metadata); err != nil {
 		fmt.Println(err)
 	}
