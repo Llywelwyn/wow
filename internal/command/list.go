@@ -5,24 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/tree"
 	"golang.org/x/term"
 
-	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/storage"
 	"github.com/llywelwyn/wow/internal/ui"
 )
 
 type ListCmd struct {
-	PreviewLines  int     `short:"n" default:"1" name:"Preview" help:"Number of lines to preview from snippets."`
-	Plain         bool    `help:"Format as a plain table of tab-separated values."`
+	PreviewLines  int     `short:"n" default:"0" name:"Preview" help:"Number of lines to preview from snippets."`
 	Tags          bool    `short:"t" help:"Display tags."`
 	Date          bool    `short:"D" negatable:"" default:"true" help:"Display creation and last-modified dates."`
 	Desc          bool    `short:"d" help:"Display description."`
@@ -144,6 +139,11 @@ func (c *ListCmd) Run(kong *kong.Context, cfg Config) error {
 	return nil
 }
 
+func (c *ListCmd) print(w io.Writer, listings []model.Metadata) error {
+	err := c.pretty(w, listings)
+	return err
+}
+
 func (c *ListCmd) paginate(listings []model.Metadata) []model.Metadata {
 	// If no limit or all listings fit on one page, return all.
 	c.TotalListings = len(listings)
@@ -171,20 +171,10 @@ func (c *ListCmd) paginate(listings []model.Metadata) []model.Metadata {
 	return listings[start:end]
 }
 
-func (c *ListCmd) print(w io.Writer, listings []model.Metadata) error {
-	printFunc := c.pretty
-	if c.Plain {
-		printFunc = c.table
-	}
-
-	err := printFunc(w, listings)
-	return err
-}
-
 func (c *ListCmd) buildHeader(style lipgloss.Style, delim string) ([]string, string, error) {
 	var cols []string
 	for _, name := range c.Columns.Order {
-		if col, exists := c.Columns.Column[name]; name != "Desc" && exists && col.Shown {
+		if col, exists := c.Columns.Column[name]; exists && col.Shown {
 			cols = append(cols, name)
 		}
 	}
@@ -192,7 +182,6 @@ func (c *ListCmd) buildHeader(style lipgloss.Style, delim string) ([]string, str
 	var headerString string
 	if c.Header {
 		var headers []string
-
 		var lastCol string
 		if len(cols) > 0 {
 			lastCol = cols[len(cols)-1]
@@ -212,45 +201,6 @@ func (c *ListCmd) buildHeader(style lipgloss.Style, delim string) ([]string, str
 	return cols, headerString, nil
 }
 
-func (c *ListCmd) table(w io.Writer, listings []model.Metadata) error {
-	cols, headerString, err := c.buildHeader(lipgloss.NewStyle(), "\t")
-	if err != nil {
-		return err
-	}
-
-	if c.Header {
-		fmt.Fprintln(w, headerString)
-	}
-
-	for _, listing := range listings {
-		var fields []string
-		for _, fieldName := range cols {
-			switch fieldName {
-			case "Name":
-				fields = append(fields, listing.Key)
-			case "Type":
-				fields = append(fields, listing.Type)
-			case "Tags":
-				fields = append(fields, listing.Tags)
-			case "Desc":
-				fields = append(fields, listing.Description)
-			case "Date":
-				modified := listing.Modified.UTC().Format("02 Jan 15:04")
-				fields = append(fields, modified)
-			}
-		}
-
-		if _, err := fmt.Fprintln(w, strings.Join(fields, "\t")); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *ListCmd) notShowingAll(first, final int) bool {
-	return first > 1 || final < c.TotalListings
-}
-
 func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
 	styles := ui.GetStyles()
 
@@ -258,7 +208,7 @@ func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
 	// our listings (e.g. we are showing a page, not everything), show page info.
 	idxFirst := c.Limit*(c.Page-1) + 1
 	idxFinal := min(c.Limit*c.Page, c.TotalListings)
-	if c.Header && c.notShowingAll(idxFirst, idxFinal) {
+	if c.Header && (idxFirst > 1 || idxFinal < c.TotalListings) {
 		header := fmt.Sprintf("Page %d of %d (%d—%d/%d)",
 			c.Page,
 			c.TotalPages,
@@ -296,16 +246,6 @@ func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
 		if _, err := fmt.Fprintln(w, c.prettyListing(listing, width, styles)); err != nil {
 			return err
 		}
-		path, err := key.ResolvePath(c.BaseDir, listing.Key)
-		if err != nil {
-			return err
-		}
-		cmd := exec.Command("head", "-n", fmt.Sprint(c.PreviewLines), path)
-		cmd.Stdout = w
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to run head on %s: %w", listing.Key, err)
-		}
 	}
 
 	return nil
@@ -321,22 +261,15 @@ func (c *ListCmd) prettyListing(listing model.Metadata, maxWidth int, styles ui.
 		}
 	}
 
-	var lastRootCol string
-	for i := len(cols) - 1; i >= 0; i-- {
-		if cols[i] != "Desc" {
-			lastRootCol = cols[i]
-			break
-		}
-	}
+	var lastRootCol string = cols[len(cols)-1]
 
 	for _, name := range cols {
-		if name == "Desc" {
-			continue
-		}
-
 		col := c.Columns.Column[name]
 		last := (name == lastRootCol)
 		val := listing.Formatted(name)
+		if val == listing.EmptyStr() {
+			name = "Empty"
+		}
 		style := c.getColumnStyle(styles, name, col.Width, maxWidth, last)
 		root = append(root, style.Render(val))
 	}
@@ -359,13 +292,15 @@ func (c *ListCmd) getColumnStyle(styles ui.Styles, name string, width, maxWidth 
 	case "Date":
 		style = styles.Body
 	case "Type":
-		style = styles.Primary
+		style = styles.Muted
 	case "Name":
-		style = styles.Body
+		style = styles.Heading
 	case "Tags":
 		style = styles.Tag
 	case "Desc":
 		style = styles.Muted
+	case "Empty":
+		style = styles.Empty
 	}
 	if !last {
 		style = style.Width(width)
@@ -391,38 +326,4 @@ func (c *ListCmd) writerWidth(w io.Writer) int {
 	}
 
 	return 0
-}
-
-type StringBuilder []string
-
-func (s StringBuilder) Prefix(v string, ok bool) StringBuilder {
-	if !ok {
-		return s
-	}
-	return append(StringBuilder{v}, s...)
-}
-
-func (s StringBuilder) Suffix(v string, ok bool) StringBuilder {
-	if !ok {
-		return s
-	}
-	return append(s, v)
-}
-
-func (s StringBuilder) Build(sep string) string {
-	return strings.Join(s, sep)
-}
-
-func (c *ListCmd) enumerator(children tree.Children, index int) string {
-	if children.Length()-1 == index {
-		return "└─ "
-	}
-	return "├─ "
-}
-
-func (c *ListCmd) indenter(children tree.Children, index int) string {
-	if children.Length()-1 == index {
-		return "   "
-	}
-	return "│  "
 }

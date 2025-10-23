@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -55,14 +56,25 @@ func (m *Metadata) NameStr() string {
 
 func (m *Metadata) TagsStr() string {
 	if len(m.Tags) == 0 {
-		return ""
+		return m.EmptyStr()
 	}
 	// Split CSV and prefix with @.
 	// one,two,three -> @one @two @three
 	split := strings.Split(m.Tags, ",")
-	return "@" + strings.Join(split, " @")
+	if len(split) == 1 {
+		return split[0]
+	} else {
+		return split[0] + "(+" + strconv.Itoa(len(split[1:])) + ")"
+	}
+}
+
+func (m *Metadata) EmptyStr() string {
+	return "--"
 }
 
 func (m *Metadata) DescStr() string {
+	if m.Description == "" {
+		return m.EmptyStr()
+	}
 	return m.Description
 }

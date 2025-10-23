@@ -114,7 +114,7 @@ func initStyle(p palette) {
 		Label: base.Foreground(p.Muted).Bold(true),
 		Key:   base.Foreground(p.Text).Bold(true),
 		Value: base.Foreground(p.Primary),
-		Tag:   base.Foreground(p.Secondary).Underline(true),
+		Tag:   base.Foreground(p.Secondary),
 		Icon:  base.Foreground(p.Primary),
 
 		Empty:    base.Foreground(p.Muted).Italic(true),
