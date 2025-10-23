@@ -158,19 +158,19 @@ func (c *GetCommand) Execute(args []string) error {
 }
 
 func writeTagSummary(w io.Writer, added, removed []string) error {
-	styles := ui.DefaultStyles()
+	styles := ui.GetStyles()
 
 	if len(added) == 0 && len(removed) == 0 {
-		_, err := fmt.Fprintln(w, styles.Subtle.Render("tags unchanged"))
+		_, err := fmt.Fprintln(w, styles.Muted.Render("tags unchanged"))
 		return err
 	}
 	if len(added) > 0 {
-		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Positive.Render("added"), formatTagList(added)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Success.Render("added"), formatTagList(added)); err != nil {
 			return err
 		}
 	}
 	if len(removed) > 0 {
-		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Negative.Render("removed"), formatTagList(removed)); err != nil {
+		if _, err := fmt.Fprintf(w, "%s %s\n", styles.Error.Render("removed"), formatTagList(removed)); err != nil {
 			return err
 		}
 	}
@@ -181,7 +181,7 @@ func formatTagList(tags []string) string {
 	if len(tags) == 0 {
 		return ""
 	}
-	styles := ui.DefaultStyles()
+	styles := ui.GetStyles()
 
 	formatted := make([]string, 0, len(tags))
 	for _, tag := range tags {
