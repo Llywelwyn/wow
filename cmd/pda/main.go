@@ -34,15 +34,15 @@ func root() error {
 	defer cfg.DB.Close()
 
 	description := `
- pda! a tool for code snippets
-
- ██     ██  ██████  ██     ██
- ██     ██ ██    ██ ██     ██
- ██  █  ██ ██    ██ ██  █  ██
- ██ ███ ██ ██    ██ ██ ███ ██  
-  ███ ███   ██████   ███ ███   (c) 2025 Lewis Wynne
-
- Licensed under the GNU Affero General Public License v3
+ pda! a tool for code snippets — GNU AGPLv3
+                 ▄▄           
+                 ██           
+ ██▄███▄    ▄███▄██   ▄█████▄
+ ██▀  ▀██  ██▀  ▀██   ▀ ▄▄▄██
+ ██    ██  ██    ██  ▄██▀▀▀██
+ ███▄▄██▀  ▀██▄▄███  ██▄▄▄███
+ ██ ▀▀▀      ▀▀▀ ▀▀   ▀▀▀▀ ▀▀
+ ██      (c) 2025 Lewis Wynne
 
  Many flags support being written in shorthand, by using one dash
  and (usually) the first letter of the flag name. Shorthand flags
