@@ -1,4 +1,4 @@
-// key manages wow keys.
+// key manages pda keys.
 // It handles the normalisation and validation of raw input keys,
 // and it resolves normalised keys to their absolute filepaths.
 package key
@@ -94,7 +94,7 @@ func validateSegment(seg string) error {
 // isAllowed reports whether the rune is permitted in a key segment.
 func isAllowed(r rune) bool {
 	switch {
-	case r == '-', r == '_', r == '.':
+	case r == '-', r == '_':
 		return true
 	case r == '/':
 		return false

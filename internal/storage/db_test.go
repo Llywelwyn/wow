@@ -8,7 +8,7 @@ import (
 
 func TestInitMetaDBCreatesSchema(t *testing.T) {
 	root := t.TempDir()
-	dbPath := filepath.Join(root, "nested", "meta.db")
+	dbPath := filepath.Join(root, "nested", ".meta.db")
 
 	db, err := InitMetaDB(dbPath)
 	if err != nil {

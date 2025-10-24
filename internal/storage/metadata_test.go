@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/model"
+	"github.com/llywelwyn/pda/internal/model"
 )
 
 func TestInsertAndGetMetadata(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "meta.db")
+	dbPath := filepath.Join(t.TempDir(), ".meta.db")
 
 	db, err := InitMetaDB(dbPath)
 	if err != nil {

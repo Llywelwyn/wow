@@ -2,425 +2,323 @@ package command
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/tree"
-	flag "github.com/spf13/pflag"
 	"golang.org/x/term"
 
-	"github.com/llywelwyn/wow/internal/model"
-	"github.com/llywelwyn/wow/internal/storage"
-	"github.com/llywelwyn/wow/internal/ui"
+	"github.com/llywelwyn/pda/internal/config"
+	"github.com/llywelwyn/pda/internal/model"
+	"github.com/llywelwyn/pda/internal/storage"
+	"github.com/llywelwyn/pda/internal/ui"
 )
 
-// ListCommand prints snippet metadata.
-type ListCommand struct {
-	DB     *sql.DB
-	Output io.Writer
+type ListCmd struct {
+	PreviewLines  int     `short:"n" default:"0" name:"Preview" help:"Number of lines to preview from snippets."`
+	Tags          bool    `short:"t" negatable:"" default:"true" help:"Display tags."`
+	Date          bool    `short:"D" help:"Display creation and last-modified dates."`
+	Desc          bool    `short:"d" negatable:"" default:"true" help:"Display description."`
+	Type          bool    `short:"T" help:"Display type."`
+	Verbose       bool    `short:"v" help:"Display all metadata."`
+	Limit         int     `short:"l" default:"50" help:"Number of snippets per page."`
+	Page          int     `short:"p" default:"1" help:"Page number."`
+	All           bool    `short:"a" help:"Disable pagination and display all snippets."`
+	Header        bool    `short:"H" negatable:"" default:"true" help:"Display header row."`
+	TotalPages    int     `kong:"-"`
+	TotalListings int     `kong:"-"`
+	Columns       Columns `kong:"-"`
+	BaseDir       string  `kong:"-"`
 }
 
-type listViewOptions struct {
-	WithTags   bool
-	WithDates  bool
-	WithDesc   bool
-	WithType   bool
-	Limit      int
-	Page       int
-	TotalItems int
-	TotalPages int
+type Columns struct {
+	Column map[string]Column
+	Order  []string
 }
 
-// NewListCommand constructs a ListCommand using defaults from cfg.
-func NewListCommand(cfg Config) *ListCommand {
-	return &ListCommand{
-		DB:     cfg.DB,
-		Output: cfg.writer(),
+func (c *Columns) SetWidths(list []model.Metadata) {
+	// Init with blank header lengths.
+	for name, col := range c.Column {
+		col.Width = len(col.Header)
+		c.Column[name] = col
+	}
+	// Get max widths from entries.
+	for _, entry := range list {
+		if c.Column["Date"].Shown {
+			col := c.Column["Date"]
+			col.Width = max(col.Width, len(entry.DateStr()))
+			c.Column["Date"] = col
+		}
+		if c.Column["Type"].Shown {
+			col := c.Column["Type"]
+			col.Width = max(col.Width, len(entry.TypeStr()))
+			c.Column["Type"] = col
+		}
+		if c.Column["Tags"].Shown {
+			col := c.Column["Tags"]
+			col.Width = max(col.Width, len(entry.TagsStr()))
+			c.Column["Tags"] = col
+		}
+		if c.Column["Id"].Shown {
+			col := c.Column["Id"]
+			col.Width = max(col.Width, len(entry.NameStr()))
+			c.Column["Id"] = col
+		}
+		if c.Column["Desc"].Shown {
+			col := c.Column["Desc"]
+			col.Width = max(col.Width, len(entry.DescStr()))
+			c.Column["Desc"] = col
+		}
 	}
 }
 
-// Name returns the command keyword for invocation.
-func (c *ListCommand) Name() string {
-	return "list"
+type Column struct {
+	Header string
+	Width  int
+	Shown  bool
 }
 
-// Execute lists metadata rows according to the provided flags.
-func (c *ListCommand) Execute(args []string) error {
-	if c.DB == nil || c.Output == nil {
-		return errors.New("list command not fully configured")
-	}
-
-	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
-	fs.SetOutput(c.Output)
-	var plain *string = fs.String("plain", "", "removes pretty formatting; pass a string to override tab-delimiter")
-	fs.Lookup("plain").NoOptDefVal = "\t"
-	var withTags *bool = fs.BoolP("tags", "t", false, "include tags")
-	var withDates *bool = fs.BoolP("dates", "D", false, "include created/updated dates")
-	var withDesc *bool = fs.BoolP("desc", "d", false, "include descriptions")
-	var withType *bool = fs.BoolP("type", "T", false, "include snippet type")
-	var all *bool = fs.BoolP("all", "a", false, "overrides --limit and any defaults, showing every listing")
-	var verbose *bool = fs.BoolP("verbose", "v", false, "show all metadata fields")
-	var limit *int = fs.IntP("limit", "l", 50, "maximum number of snippets to display per page")
-	var page *int = fs.IntP("page", "p", 1, "page number (1-based)")
-	var help *bool = fs.BoolP("help", "h", false, "display help")
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-
-	if *help {
-		fmt.Fprintln(c.Output, `Usage:
-  wow list [--limit int] [--page int] [--plain] [--verbose]
-           [--tags] [--type] [--desc] [--dates] [--all]
-
-  wow! Lists metadata for all the snippets you've got saved.
-  It's modular, with support for pagination, and tabular or
-  prettified output.
-
-  By default there's a limit of 50 listings per page.
-     --page lets you view different pages.
-     --all removes this limit entirely.
-     --limit lets you change it for this query.
-
-  Use --limit and --page for pagination. If you've got 1000
-  listings, --limit 5 will split into 200 pages of 5.
-
-  Without any extra flags, it displays a list of saved keys
-  only. With --verbose or -v, all metadata fields are shown.
-  Individual flags can be used for more granular control.
-
-  Use --plain for tabular output to make writing scripts to
-  parse lists easier. You can replace tabs with a different
-  delimiter by passing any string as an argument.`)
-		fmt.Fprintln(c.Output)
-		fs.PrintDefaults()
-		return nil
-	}
-
-	if *limit < 0 {
+func (c *ListCmd) Run(kong *kong.Context, cfg config.Config) error {
+	if c.Limit < 0 {
 		return errors.New("limit must be >= 0")
 	}
-	if *page < 1 {
+
+	if c.Page < 1 {
 		return errors.New("page must be >= 1")
 	}
-	if *limit == 0 {
-		*page = 1
+
+	if c.All {
+		c.Limit = 0
 	}
 
+	if c.Limit == 0 {
+		c.Page = 1
+	}
+
+	c.Columns = Columns{
+		Column: map[string]Column{
+			"Date": {
+				Header: "Date Modified",
+				Width:  0,
+				Shown:  c.Date || c.Verbose},
+			"Type": {
+				Header: "Type",
+				Width:  0, Shown: c.Type || c.Verbose},
+			"Id": {
+				Header: "Id",
+				Width:  0,
+				Shown:  true},
+			"Tags": {
+				Header: "Tags",
+				Width:  0,
+				Shown:  c.Tags || c.Verbose},
+			"Desc": {
+				Header: "Desc",
+				Width:  0,
+				Shown:  c.Desc || c.Verbose},
+		},
+		Order: []string{"Date", "Type", "Id", "Tags", "Desc"},
+	}
+
+	c.BaseDir = cfg.BaseDir
 	ctx := context.Background()
-	entries, err := storage.ListMetadata(ctx, c.DB)
+	listings, err := storage.ListMetadata(ctx, cfg.DB)
 	if err != nil {
 		return err
 	}
+	listings = c.paginate(listings)
+	c.Columns.SetWidths(listings)
 
-	actualLimit := *limit
-	if *all {
-		actualLimit = 0
-	}
-	opts := listViewOptions{
-		WithTags:  *withTags || *verbose,
-		WithDates: *withDates || *verbose,
-		WithDesc:  *withDesc || *verbose,
-		WithType:  *withType || *verbose,
-		Limit:     actualLimit,
-		Page:      *page,
-	}
+	c.print(cfg.Output, listings)
 
-	opts.TotalItems = len(entries)
-	if opts.Limit > 0 {
-		if opts.TotalItems == 0 {
-			opts.TotalPages = 1
-			opts.Page = 1
-		} else {
-			opts.TotalPages = (opts.TotalItems + opts.Limit - 1) / opts.Limit
-			if opts.Page > opts.TotalPages {
-				opts.Page = opts.TotalPages
-			}
-			if opts.Page < 1 {
-				opts.Page = 1
-			}
-		}
-	} else {
-		opts.TotalPages = 1
-		opts.Page = 1
-	}
-	entries = paginateEntries(entries, opts.Limit, opts.Page)
-
-	if *plain != "" || !writerIsTerminal(c.Output) {
-		delimiter := *plain
-		if delimiter == "" {
-			delimiter = "\t"
-		}
-		return renderPlainList(c.Output, entries, opts, delimiter)
-	}
-	return renderStyledList(c.Output, entries, opts)
-}
-
-func writerIsTerminal(w io.Writer) bool {
-	type fdWriter interface {
-		io.Writer
-		Fd() uintptr
-	}
-	if f, ok := w.(fdWriter); ok {
-		return term.IsTerminal(int(f.Fd()))
-	}
-	return false
-}
-
-func renderPlainList(w io.Writer, entries []model.Metadata, opts listViewOptions, delimiter string) error {
-	for _, meta := range entries {
-		fields := []string{meta.Key}
-		if opts.WithType {
-			fields = append(fields, meta.Type)
-		}
-		if opts.WithTags {
-			fields = append(fields, plainTagList(meta.Tags))
-		}
-		if opts.WithDates {
-			created := meta.Created.UTC().Format(time.DateOnly)
-			modified := ""
-			if !meta.Modified.Equal(meta.Created) {
-				modified = meta.Modified.UTC().Format(time.DateOnly)
-			}
-			fields = append(fields, created, modified)
-		}
-		if opts.WithDesc {
-			fields = append(fields, meta.Description)
-		}
-
-		if _, err := fmt.Fprintln(w, strings.Join(fields, delimiter)); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-func makeFlagsString(opts listViewOptions) string {
-	if opts.WithDates && opts.WithDesc && opts.WithTags && opts.WithType {
-		return "viewing all metadata"
-	}
-
-	var flags []string
-	if opts.WithTags {
-		flags = append(flags, "tags")
-	}
-	if opts.WithType {
-		flags = append(flags, "type")
-	}
-	if opts.WithDates {
-		flags = append(flags, "dates")
-	}
-	if opts.WithDesc {
-		flags = append(flags, "descriptions")
-	}
-
-	if len(flags) == 0 {
-		return "viewing only names"
-	}
-
-	var flagstr string
-	switch len(flags) {
-	case 1:
-		flagstr = flags[0]
-	case 2:
-		flagstr = flags[0] + " and " + flags[1]
-	default:
-		flagstr = strings.Join(flags[:len(flags)-1], ", ") + ", and " + flags[len(flags)-1]
-	}
-
-	return "viewing " + flagstr
+func (c *ListCmd) print(w io.Writer, listings []model.Metadata) error {
+	err := c.pretty(w, listings)
+	return err
 }
 
-func renderStyledList(w io.Writer, entries []model.Metadata, opts listViewOptions) error {
-	styles := ui.DefaultStyles()
-
-	firstEntryNum := opts.Limit*(opts.Page-1) + 1
-	lastEntryNum := min(opts.Limit*opts.Page, opts.TotalItems)
-	header := fmt.Sprintf("Page %d of %d (showing %d to %d out of %d total)",
-		opts.Page,
-		opts.TotalPages,
-		firstEntryNum,
-		lastEntryNum,
-		opts.TotalItems)
-	fmt.Fprintln(w, styles.Subtle.Render(header))
-	if flagstr := makeFlagsString(opts); flagstr != "" {
-		fmt.Fprintln(w, styles.Secondary.Render(flagstr))
+func (c *ListCmd) paginate(listings []model.Metadata) []model.Metadata {
+	// If no limit or all listings fit on one page, return all.
+	c.TotalListings = len(listings)
+	c.TotalPages = (c.TotalListings + c.Limit - 1) / c.Limit
+	if c.Limit <= 0 || c.TotalListings <= c.Limit {
+		return listings
 	}
-	fmt.Fprintln(w)
 
-	if len(entries) == 0 {
+	// Clamp page number to valid range.
+	c.Page = min(c.Page, c.TotalPages)
+	c.Page = max(c.Page, 1)
+
+	// Get our start index, return empty if past c.TotalListings.
+	start := (c.Page - 1) * c.Limit
+	if start >= c.TotalListings {
+		return listings[:0]
+	}
+
+	// Get our end index, clamped to c.TotalListings.
+	end := min(start+c.Limit, c.TotalListings)
+
+	return listings[start:end]
+}
+
+func (c *ListCmd) buildHeader(style lipgloss.Style, delim string) ([]string, string, error) {
+	var cols []string
+	for _, name := range c.Columns.Order {
+		if col, exists := c.Columns.Column[name]; exists && col.Shown {
+			cols = append(cols, name)
+		}
+	}
+
+	var headerString string
+	if c.Header {
+		var headers []string
+		var lastCol string
+		if len(cols) > 0 {
+			lastCol = cols[len(cols)-1]
+		}
+
+		for _, colName := range cols {
+			col := c.Columns.Column[colName]
+			last := (colName == lastCol)
+
+			if !last {
+				style = style.Width(col.Width).AlignHorizontal(lipgloss.Left)
+			}
+			headers = append(headers, style.Render(col.Header))
+		}
+		headerString = strings.Join(headers, delim)
+	}
+	return cols, headerString, nil
+}
+
+func (c *ListCmd) pretty(w io.Writer, listings []model.Metadata) error {
+	styles := ui.GetStyles()
+
+	// If we want to show the header (c.Header), and we're showing a subset of
+	// our listings (e.g. we are showing a page, not everything), show page info.
+	idxFirst := c.Limit*(c.Page-1) + 1
+	idxFinal := min(c.Limit*c.Page, c.TotalListings)
+	if c.Header && (idxFirst > 1 || idxFinal < c.TotalListings) {
+		header := fmt.Sprintf("Page %d of %d (%d—%d/%d)",
+			c.Page,
+			c.TotalPages,
+			idxFirst,
+			idxFinal,
+			c.TotalListings)
+
+		fmt.Fprintln(w, styles.Body.Render(header))
+	}
+
+	// If we want headers, print them.
+	if c.Header {
+		cols, headerLine, err := c.buildHeader(styles.Underline, " ")
+		if err != nil {
+			return err
+		}
+		_ = cols
+		if headerLine != "" {
+			fmt.Fprintln(w, headerLine)
+		}
+	}
+
+	if c.TotalListings == 0 {
 		_, err := fmt.Fprintln(w, styles.Empty.Render("(no snippets)"))
 		return err
 	}
 
-	screenWidth := writerWidth(w)
-	if screenWidth <= 0 {
-		screenWidth = 80
+	// Default width to 80. Override with io.Writer width if possible.
+	width := 80
+	if wWidth := c.writerWidth(w); wWidth > 0 {
+		width = wWidth
 	}
-	contentWidth := max(screenWidth-4, 40)
 
-	for _, meta := range entries {
-		if _, err := fmt.Fprintln(w, renderStyledEntry(meta, contentWidth, styles, opts)); err != nil {
+	for _, listing := range listings {
+		if _, err := fmt.Fprintln(w, c.prettyListing(listing, width, styles)); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func buildKeyLine(meta model.Metadata, styles ui.Styles, opts listViewOptions) string {
-	if opts.WithType {
-		icon := strings.TrimSpace(meta.TypeIcon())
-		if icon != "" {
-			return fmt.Sprintf("%s %s",
-				styles.Icon.Render(icon),
-				styles.Key.Render(meta.Key),
-			)
+func (c *ListCmd) prettyListing(listing model.Metadata, maxWidth int, styles ui.Styles) string {
+	var lines []string
+	var root []string
+	var cols []string
+	for _, name := range c.Columns.Order {
+		if col, exists := c.Columns.Column[name]; exists && col.Shown {
+			cols = append(cols, name)
 		}
 	}
-	return styles.Key.Render(meta.Key)
-}
 
-func buildRootLine(meta model.Metadata, styles ui.Styles, wrap lipgloss.Style, opts listViewOptions) string {
-	base := buildKeyLine(meta, styles, opts)
-	if opts.WithTags {
-		if tags := styledTagList(meta.Tags, styles); tags != "" {
-			base = fmt.Sprintf("%s %s", base, tags)
+	var lastRootCol string = cols[len(cols)-1]
+
+	for _, name := range cols {
+		col := c.Columns.Column[name]
+		last := (name == lastRootCol)
+		val := listing.Formatted(name)
+		if val == listing.EmptyStr() {
+			name = "Empty"
+		}
+		style := c.getColumnStyle(styles, name, col.Width, maxWidth, last)
+		root = append(root, style.Render(val))
+	}
+
+	spacer := styles.Body.Width(1).Render(" ")
+	var rootRender []string
+	for i, part := range root {
+		rootRender = append(rootRender, part)
+		if i < len(root)-1 {
+			rootRender = append(rootRender, spacer)
 		}
 	}
-	return wrap.Render(base)
+	lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Left, rootRender...))
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
-func writerWidth(w io.Writer) int {
+func (c *ListCmd) getColumnStyle(styles ui.Styles, name string, width, maxWidth int, last bool) lipgloss.Style {
+	var style lipgloss.Style
+	switch name {
+	case "Date":
+		style = styles.Body
+	case "Type":
+		style = styles.Muted
+	case "Id":
+		style = styles.Heading
+	case "Tags":
+		style = styles.Tag
+	case "Desc":
+		style = styles.Muted
+	case "Empty":
+		style = styles.Empty
+	}
+	if !last {
+		style = style.Width(width)
+	} else if name == "Desc" {
+		style = style.MaxWidth(maxWidth)
+	}
+	return style
+}
+
+func (c *ListCmd) writerWidth(w io.Writer) int {
 	type fdWriter interface {
 		io.Writer
 		Fd() uintptr
 	}
-	if f, ok := w.(fdWriter); ok {
-		if wd, _, err := term.GetSize(int(f.Fd())); err == nil && wd > 0 {
-			return wd
-		}
+
+	f, ok := w.(fdWriter)
+	if !ok {
+		return 0
 	}
+
+	if width, _, err := term.GetSize(int(f.Fd())); err == nil && width > 0 {
+		return width
+	}
+
 	return 0
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func renderStyledEntry(meta model.Metadata, width int, styles ui.Styles, opts listViewOptions) string {
-	rootWidth := max(width, 40)
-	childWidth := max(width-4, 20)
-
-	rootWrap := lipgloss.NewStyle().
-		Width(rootWidth).
-		MaxWidth(rootWidth)
-	childWrap := lipgloss.NewStyle().
-		Width(childWidth).
-		MaxWidth(childWidth)
-
-	rootLine := buildRootLine(meta, styles, rootWrap, opts)
-
-	t := tree.Root(rootLine).
-		Enumerator(compactEnumerator).
-		EnumeratorStyle(styles.Subtle).
-		Indenter(compactIndenter).
-		RootStyle(lipgloss.NewStyle()).
-		ItemStyle(lipgloss.NewStyle())
-
-	if opts.WithDates {
-		if dateLine := buildDateLine(meta, styles); dateLine != "" {
-			t.Child(childWrap.Render(dateLine))
-		}
-	}
-
-	if opts.WithDesc {
-		if desc := strings.TrimSpace(meta.Description); desc != "" {
-			t.Child(childWrap.Render(styles.Subtle.Render(desc)))
-		}
-	}
-
-	return t.String()
-}
-
-func buildDateLine(meta model.Metadata, styles ui.Styles) string {
-	created := styles.Subtle.Render(meta.Created.UTC().Format(time.DateOnly))
-	components := []string{
-		fmt.Sprintf("%s %s", styles.Label.Render("created"), created),
-	}
-	if !meta.Modified.Equal(meta.Created) {
-		modified := styles.Subtle.Render(meta.Modified.UTC().Format(time.DateOnly))
-		components = append(components, fmt.Sprintf("%s %s", styles.Label.Render("last updated"), modified))
-	}
-	return strings.Join(components, "  ")
-}
-
-func paginateEntries(entries []model.Metadata, limit, page int) []model.Metadata {
-	if limit <= 0 || len(entries) == 0 {
-		return entries
-	}
-	if page < 1 {
-		page = 1
-	}
-	start := (page - 1) * limit
-	if start >= len(entries) {
-		return entries[:0]
-	}
-	end := start + limit
-	if end > len(entries) {
-		end = len(entries)
-	}
-	return entries[start:end]
-}
-
-func styledTagList(raw string, styles ui.Styles) string {
-	if strings.TrimSpace(raw) == "" {
-		return ""
-	}
-	split := strings.Split(raw, ",")
-	formatted := make([]string, 0, len(split))
-	for _, part := range split {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		formatted = append(formatted, styles.Tag.Render("@"+part))
-	}
-	return strings.Join(formatted, " ")
-}
-
-func plainTagList(raw string) string {
-	if strings.TrimSpace(raw) == "" {
-		return ""
-	}
-	parts := strings.Split(raw, ",")
-	formatted := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		formatted = append(formatted, "@"+part)
-	}
-	return strings.Join(formatted, " ")
-}
-
-func compactEnumerator(children tree.Children, index int) string {
-	if children.Length()-1 == index {
-		return "└─ "
-	}
-	return "├─ "
-}
-
-func compactIndenter(children tree.Children, index int) string {
-	if children.Length()-1 == index {
-		return "   "
-	}
-	return "│  "
 }

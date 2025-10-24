@@ -1,3 +1,0 @@
-$ setenv WOW_HOME ${ROOTDIR}/home
-$ wow get --tag test notes/demo --> FAIL
-error: key must be the first argument

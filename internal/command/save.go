@@ -1,92 +1,92 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	flag "github.com/spf13/pflag"
 	"io"
+	"strconv"
 	"strings"
 
-	"github.com/llywelwyn/wow/internal/services"
+	"github.com/alecthomas/kong"
+
+	"github.com/llywelwyn/pda/internal/config"
+	"github.com/llywelwyn/pda/internal/key"
+	"github.com/llywelwyn/pda/internal/model"
+	"github.com/llywelwyn/pda/internal/storage"
+	"github.com/llywelwyn/pda/internal/ui"
 )
 
-// SaveCommand persists snippet content read from stdin and prints the resolved key.
-type SaveCommand struct {
-	Saver  *services.Saver
-	Input  io.Reader
-	Output io.Writer
+type SaveCmd struct {
+	Desc []string `arg:"" optional:""`
+	Tag  []string `help:"Comma-separated tags to add."`
 }
 
-// NewSaveCommand constructs a SaveCommand using default dependencies from cfg.
-func NewSaveCommand(cfg Config) *SaveCommand {
-	return &SaveCommand{
-		Saver: &services.Saver{
-			BaseDir: cfg.BaseDir,
-			DB:      cfg.DB,
-			Now:     cfg.clock(),
-		},
-		Input:  cfg.reader(),
-		Output: cfg.writer(),
-	}
-}
+func (c *SaveCmd) Run(kong *kong.Context, cfg config.Config) error {
+	ctx := context.Background()
 
-// Name returns the command keyword for explicit invocation.
-func (c *SaveCommand) Name() string {
-	return "save"
-}
-
-// Execute saves the snippet using the provided arguments.
-func (c *SaveCommand) Execute(args []string) error {
-	if c.Saver == nil || c.Input == nil || c.Output == nil {
-		return errors.New("save command not fully configured")
-	}
-
-	tagArgs := extractTagArgs(args)
-	args = tagArgs.Others
-
-	fs := flag.NewFlagSet("save", flag.ContinueOnError)
-	fs.SetOutput(c.Output)
-	var tee *bool = fs.BoolP("tee", "T", false, "print stdin back out, rather than the key")
-	var desc *string = fs.StringP("desc", "d", "", "description")
-	var tags *string = fs.StringP("tag", "t", "", "comma-separated tags, e.g. one,two")
-	var help *bool = fs.BoolP("help", "h", false, "display help")
-
-	var keyArg string
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		keyArg = args[0]
-		args = args[1:]
-	}
-
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-
-	if *help {
-		fmt.Fprintln(c.Output, `Usage:
-  wow save [key] [--desc description] [--tag tags] [@tag ...] < snippet`)
-		fs.PrintDefaults()
-		return nil
-	}
-
-	addTags := append(splitTags(*tags), tagArgs.Add...)
-
-	res, err := c.Saver.Save(context.Background(), services.SaveRequest{
-		Key:         keyArg,
-		Description: *desc,
-		Tags:        addTags,
-		Reader:      c.Input,
-	})
+	payload, err := io.ReadAll(cfg.Input)
 	if err != nil {
-		return err
+		return fmt.Errorf("read stdin: %w", err)
+	}
+	if len(payload) == 0 {
+		return errors.New("snippet content is empty")
 	}
 
-	output := res.Key
-	if *tee {
-		output = string(res.Contents[:])
+	now := cfg.Clock().UTC()
+	snippetType := detectSnippetType(payload)
+
+	nextId, err := cfg.NextId()
+	if err != nil {
+		return fmt.Errorf("generate key: %w", err)
 	}
-	if _, err := fmt.Fprintln(c.Output, output); err != nil {
-		return fmt.Errorf("write key to output: %w", err)
+	id := strconv.Itoa(nextId)
+
+	path, err := key.ResolvePath(cfg.BaseDir, id)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
 	}
+
+	exists, err := storage.Exists(path)
+	if err != nil {
+		return fmt.Errorf("check snippet exists: %w", err)
+	}
+	if exists {
+		return errors.New("snippet with that ID already exists")
+	}
+
+	if err := storage.Save(path, bytes.NewReader(payload)); err != nil {
+		return fmt.Errorf("save snippt: %w", err)
+	}
+
+	metadata := model.Metadata{
+		Key:         id,
+		Type:        snippetType,
+		Modified:    now,
+		Description: strings.Join(c.Desc, " "),
+		Tags:        strings.Join(c.Tag, ","),
+	}
+
+	if err := storage.InsertMetadata(ctx, cfg.DB, metadata); err != nil {
+		_ = storage.Delete(path)
+		if errors.Is(err, storage.ErrMetadataDuplicate) {
+			return errors.New("snippet with that ID already exists")
+		}
+		return fmt.Errorf("insert metadata: %w", err)
+	}
+
+	fmt.Fprintln(cfg.Output, c.makeSaveOutput(metadata))
+
 	return nil
+}
+
+func (c *SaveCmd) makeSaveOutput(metadata model.Metadata) string {
+	styles := ui.GetStyles()
+	desc := "snippet"
+	if metadata.Description != "" {
+		desc = fmt.Sprintf("'%s'", metadata.Description)
+	}
+	res := fmt.Sprintf("Saved %s with ID: %s", styles.Primary.Render(desc), styles.Key.Render(metadata.Key))
+	return res
 }

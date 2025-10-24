@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
+# Run all .tape files except the EXCLUDE list.
+
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TMP_HOME="pda-tmp-home"
 
-echo "building wow-vhs docker image"
-docker build -t wow-vhs -f "$REPO_ROOT/vhs/Dockerfile" "$REPO_ROOT"
-echo "running vhs"
-for tape in "$REPO_ROOT"/vhs/*.tape; do
-  echo "recording $(basename "$tape")"
-  docker run --rm \
-    -v "$REPO_ROOT":/repo \
-    -e WOW_HOME=/tmp/wow-home \
-    --tmpfs /tmp \
-    wow-vhs "./vhs/$(basename "$tape")"
+for file in *.tape; do
+  if [[ "$file" == _* ]]; then
+    echo "skipping $file (starts with _)"
+    continue
+  fi
+  echo "running vhs on $file"
+  vhs "$file"
 done
-echo "done, demo images saved in $REPO_ROOT/vhs"
+
+echo "starting clean-up"
+echo "removing $TMP_HOME"
+rm -rf -- "$TMP_HOME"
+echo "removing any leftover txt files"
+rm -f -- ./*.txt || true
+echo "Finished."
+

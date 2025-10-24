@@ -1,11 +1,12 @@
-package services
+package command
 
 import (
 	"bytes"
 	"strings"
 )
 
-func detectType(payload []byte) string {
+// detectSnippetType inspects the payload to infer a snippet type.
+func detectSnippetType(payload []byte) string {
 	first := firstLine(payload)
 	if isURL(first) {
 		return "url"

@@ -6,66 +6,118 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Styles exposes the reusable primitives used to render wow output.
-// Everything funnels through this struct so we can evolve the palette in one spot.
+type palette struct {
+	Primary   lipgloss.AdaptiveColor
+	Secondary lipgloss.AdaptiveColor
+	Muted     lipgloss.AdaptiveColor
+	Success   lipgloss.AdaptiveColor
+	Danger    lipgloss.AdaptiveColor
+	Text      lipgloss.AdaptiveColor
+}
+
+type colors struct {
+	Primary   string
+	Secondary string
+	Muted     string
+	Success   string
+	Danger    string
+	Text      string
+}
+
+func defaultPalette() palette {
+	light := colors{
+		Primary:   "#0066CC",
+		Secondary: "#6B46C1",
+		Muted:     "#64748B",
+		Success:   "#059669",
+		Danger:    "#DC2626",
+		Text:      "#1E293B",
+	}
+
+	dark := colors{
+		Primary:   "#66B3FF",
+		Secondary: "#A78BFA",
+		Muted:     "#94A3B8",
+		Success:   "#34D399",
+		Danger:    "#F87171",
+		Text:      "#F1F5F9",
+	}
+
+	return palette{
+		Primary:   lipgloss.AdaptiveColor{Light: light.Primary, Dark: dark.Primary},
+		Secondary: lipgloss.AdaptiveColor{Light: light.Secondary, Dark: dark.Secondary},
+		Muted:     lipgloss.AdaptiveColor{Light: light.Muted, Dark: dark.Muted},
+		Success:   lipgloss.AdaptiveColor{Light: light.Success, Dark: dark.Success},
+		Danger:    lipgloss.AdaptiveColor{Light: light.Danger, Dark: dark.Danger},
+		Text:      lipgloss.AdaptiveColor{Light: light.Text, Dark: dark.Text},
+	}
+}
+
 type Styles struct {
-	Header    lipgloss.Style
-	Icon      lipgloss.Style
-	Key       lipgloss.Style
-	Accent    lipgloss.Style
+	// Textual
+	Heading   lipgloss.Style
+	Body      lipgloss.Style
+	Muted     lipgloss.Style
+	Bold      lipgloss.Style
+	Underline lipgloss.Style
+	Italic    lipgloss.Style
+
+	// Semantic
+	Primary   lipgloss.Style
 	Secondary lipgloss.Style
-	Subtle    lipgloss.Style
-	Label     lipgloss.Style
-	Tag       lipgloss.Style
-	Positive  lipgloss.Style
-	Negative  lipgloss.Style
-	Empty     lipgloss.Style
+	Success   lipgloss.Style
+	Error     lipgloss.Style
+
+	// Components
+	Label lipgloss.Style
+	Key   lipgloss.Style
+	Value lipgloss.Style
+	Tag   lipgloss.Style
+	Icon  lipgloss.Style
+
+	// State
+	Empty    lipgloss.Style
+	Disabled lipgloss.Style
 }
 
 var (
-	defaultStyles Styles
-	once          sync.Once
+	styles Styles
+	once   sync.Once
 )
 
-// DefaultStyles returns the shared style set used across commands.
-// It is initialised lazily so tests can tweak lipgloss globals before use.
-func DefaultStyles() Styles {
-	once.Do(func() {
-		accent := lipgloss.AdaptiveColor{Light: "#005F87", Dark: "#5FD7FF"}
-		secondary := lipgloss.AdaptiveColor{Light: "#5F5F87", Dark: "#9EA1E1"}
-		subtle := lipgloss.AdaptiveColor{Light: "#6C6C6C", Dark: "#AAAAAA"}
-		success := lipgloss.AdaptiveColor{Light: "#2B8A3E", Dark: "#81C995"}
-		danger := lipgloss.AdaptiveColor{Light: "#C92A2A", Dark: "#FF6B6B"}
+func GetStyles() Styles {
+	once.Do(initDefaultStyle)
+	return styles
+}
 
-		defaultStyles = Styles{
-			Header: lipgloss.NewStyle().
-				Foreground(accent).
-				Bold(true),
-			Icon: lipgloss.NewStyle().
-				Foreground(accent),
-			Key: lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "#212529", Dark: "#ECEFF4"}).
-				Bold(true),
-			Accent: lipgloss.NewStyle().
-				Foreground(accent),
-			Secondary: lipgloss.NewStyle().
-				Foreground(secondary),
-			Subtle: lipgloss.NewStyle().
-				Foreground(subtle),
-			Label: lipgloss.NewStyle().
-				Foreground(subtle).
-				Bold(true),
-			Tag: lipgloss.NewStyle().
-				Foreground(secondary).
-				Bold(true).Underline(true),
-			Positive: lipgloss.NewStyle().
-				Foreground(success),
-			Negative: lipgloss.NewStyle().
-				Foreground(danger),
-			Empty: lipgloss.NewStyle().
-				Foreground(subtle).
-				Italic(true),
-		}
-	})
-	return defaultStyles
+func initDefaultStyle() {
+	p := defaultPalette()
+	initStyle(p)
+}
+
+func initStyle(p palette) {
+	base := lipgloss.NewStyle()
+
+	styles = Styles{
+		Heading:   base.Foreground(p.Primary).Bold(true),
+		Body:      base.Foreground(p.Text),
+		Muted:     base.Foreground(p.Muted),
+		Bold:      base.Foreground(p.Text).Bold(true),
+		Underline: base.Foreground(p.Text).Underline(true),
+		Italic:    base.Foreground(p.Text).Italic(true),
+
+		Primary:   base.Foreground(p.Primary),
+		Secondary: base.Foreground(p.Secondary),
+		Success:   base.Foreground(p.Success),
+		Error:     base.Foreground(p.Danger),
+
+		Label: base.Foreground(p.Muted).Bold(true),
+		Key:   base.Foreground(p.Text).Bold(true),
+		Value: base.Foreground(p.Primary),
+		Tag:   base.Foreground(p.Secondary),
+		Icon:  base.Foreground(p.Primary),
+
+		Empty:    base.Foreground(p.Muted).Italic(true),
+		Disabled: base.Foreground(p.Muted).Faint(true),
+	}
 }

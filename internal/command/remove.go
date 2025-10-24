@@ -2,57 +2,33 @@ package command
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
-	flag "github.com/spf13/pflag"
+	"github.com/alecthomas/kong"
 
-	"github.com/llywelwyn/wow/internal/services"
+	"github.com/llywelwyn/pda/internal/config"
+	"github.com/llywelwyn/pda/internal/key"
+	"github.com/llywelwyn/pda/internal/storage"
 )
 
-// RemoveCommand deletes snippets identified by key.
-type RemoveCommand struct {
-	Remover *services.Remover
+type RemoveCmd struct {
+	Key string `arg:"" name:"key" help:"Snippet key."`
 }
 
-// NewRemoveCommand constructs a RemoveCommand using defaults from cfg.
-func NewRemoveCommand(cfg Config) *RemoveCommand {
-	return &RemoveCommand{
-		Remover: &services.Remover{
-			BaseDir: cfg.BaseDir,
-			DB:      cfg.DB,
-		},
+func (c *RemoveCmd) Run(ctx *kong.Context, cfg config.Config) error {
+	normalizedKey, err := key.Normalize(c.Key)
+	if err != nil {
+		fmt.Fprintln(cfg.Output, err)
 	}
-}
-
-// Name returns the command keyword.
-func (c *RemoveCommand) Name() string { return "remove" }
-
-// Execute deletes the provided snippet key.
-func (c *RemoveCommand) Execute(args []string) error {
-	if c.Remover == nil {
-		return errors.New("remove command not configured")
+	path, err := key.ResolvePath(cfg.BaseDir, normalizedKey)
+	if err != nil {
+		fmt.Fprintln(cfg.Output, err)
 	}
-
-	fs := flag.NewFlagSet(c.Name(), flag.ContinueOnError)
-	fs.SetOutput(os.Stdout)
-	var help *bool = fs.BoolP("help", "h", false, "display help")
-	if err := fs.Parse(args); err != nil {
-		return err
+	if err := storage.Delete(path); err != nil {
+		fmt.Fprintln(cfg.Output, err)
 	}
-
-	if *help {
-		fmt.Fprintln(os.Stdout, `Usage:
-  wow remove <key>`)
-		fs.PrintDefaults()
-		return nil
+	if err := storage.DeleteMetadata(context.Background(), cfg.DB, normalizedKey); err != nil {
+		fmt.Fprintln(cfg.Output, err)
 	}
-
-	remaining := fs.Args()
-	if len(remaining) == 0 {
-		return errors.New("key required")
-	}
-	key := remaining[0]
-	return c.Remover.Remove(context.Background(), key)
+	return nil
 }

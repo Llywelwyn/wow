@@ -19,7 +19,7 @@ func Save(path string, content io.Reader) error {
 		return fmt.Errorf("create snippet dir %q: %w", dir, err)
 	}
 
-	tmp, err := os.CreateTemp(dir, ".wow-*")
+	tmp, err := os.CreateTemp(dir, ".pda-*")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}

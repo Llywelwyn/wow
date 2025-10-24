@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-TEST_DIR="${1:-cmd/wow/cmdtest}"
+TEST_DIR="${1:-cmd/pda/cmdtest}"
 
 command -v fzf >/dev/null 2>&1 || { echo "err: fzf is required" >&2; exit 1; }
 [[ -d "$TEST_DIR" ]] || { echo "err: dir not found: $TEST_DIR" >&2; exit 1; }

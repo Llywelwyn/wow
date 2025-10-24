@@ -9,7 +9,7 @@ import (
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 
-	"github.com/llywelwyn/wow/internal/model"
+	"github.com/llywelwyn/pda/internal/model"
 )
 
 // ErrMetadataNotFound indicates there is no row for the requested key.
