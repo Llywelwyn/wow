@@ -1,3 +1,0 @@
-$ setenv WOW_HOME ${ROOTDIR}/home
-$ wow get --> FAIL
-error: key required

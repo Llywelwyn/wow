@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-TMP_HOME="wow-tmp-home"
+TMP_HOME="pda-tmp-home"
 
 for file in *.tape; do
   if [[ "$file" == _* ]]; then

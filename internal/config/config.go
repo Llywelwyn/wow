@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/editor"
-	"github.com/llywelwyn/wow/internal/opener"
-	"github.com/llywelwyn/wow/internal/runner"
-	"github.com/llywelwyn/wow/internal/storage"
+	"github.com/llywelwyn/pda/internal/editor"
+	"github.com/llywelwyn/pda/internal/opener"
+	"github.com/llywelwyn/pda/internal/runner"
+	"github.com/llywelwyn/pda/internal/storage"
 )
 
-// Config stores wow base directory
+// Config stores pda base directory
 // and the metadata DB paths.
 type Config struct {
 	BaseDir string
@@ -70,27 +70,27 @@ func Load() (Config, error) {
 // resolveBaseDir figures out the base directory we want to use.
 //
 // It falls back through the following directories in order:
-//   - $WOW_HOME
+//   - $PDA_HOME
 //   - $XDG_DATA_HOME
 //   - $HOME
 //
 // It returns the first directory to resolve.
 // If no fallbacks resolve a valid directory, it errors.
 func resolveBaseDir() (string, error) {
-	if dir := strings.TrimSpace(os.Getenv("WOW_HOME")); dir != "" {
+	if dir := strings.TrimSpace(os.Getenv("PDA_HOME")); dir != "" {
 		return normalizeDir(dir)
 	}
 
 	if xdg := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); xdg != "" {
-		return normalizeDir(filepath.Join(xdg, "wow"))
+		return normalizeDir(filepath.Join(xdg, "pda"))
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {
-		return "", errors.New("cannot determine home directory; set WOW_HOME explicitly")
+		return "", errors.New("cannot determine home directory; set PDA_HOME explicitly")
 	}
 
-	return normalizeDir(filepath.Join(home, ".wow"))
+	return normalizeDir(filepath.Join(home, ".pda"))
 }
 
 // normalizeDir normalises a directory string to an absolute filepath.

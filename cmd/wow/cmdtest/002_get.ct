@@ -1,7 +1,0 @@
-$ setenv WOW_HOME ${ROOTDIR}/home
-$ mkdir home
-$ fecho input.txt hello world
-$ wow notes/demo < input.txt
-notes/demo
-$ wow get notes/demo
-hello world

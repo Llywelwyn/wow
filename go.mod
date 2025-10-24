@@ -1,4 +1,4 @@
-module github.com/llywelwyn/wow
+module github.com/llywelwyn/pda
 
 go 1.25.2
 

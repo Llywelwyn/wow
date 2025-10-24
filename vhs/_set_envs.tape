@@ -1,9 +1,9 @@
 Hide 
-Type 'rm -rf wow-tmp-home'
+Type 'rm -rf pda-tmp-home'
 Enter
-Type 'mkdir wow-tmp-home'
+Type 'mkdir pda-tmp-home'
 Enter
-Type 'export WOW_HOME="$(pwd)/wow-tmp-home"'
+Type 'export PDA_HOME="$(pwd)/pda-tmp-home"'
 Enter
 Type 'clear'
 Enter

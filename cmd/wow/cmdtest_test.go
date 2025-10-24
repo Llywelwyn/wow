@@ -20,12 +20,12 @@ var (
 func buildCLI(t *testing.T) string {
 	t.Helper()
 	buildOnce.Do(func() {
-		tmp, err := os.MkdirTemp("", "wow-cli-")
+		tmp, err := os.MkdirTemp("", "pda-cli-")
 		if err != nil {
 			buildErr = err
 			return
 		}
-		bin := filepath.Join(tmp, "wow")
+		bin := filepath.Join(tmp, "pda")
 		cmd := exec.Command("go", "build", "-o", bin, ".")
 		cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod")
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -48,7 +48,7 @@ func TestCmdtests(t *testing.T) {
 		t.Fatalf("read suite: %v", err)
 	}
 
-	suite.Commands["wow"] = cmdtest.Program(bin)
+	suite.Commands["pda"] = cmdtest.Program(bin)
 
 	suite.Run(t, false)
 }

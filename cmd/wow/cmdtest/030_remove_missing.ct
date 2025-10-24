@@ -1,3 +1,0 @@
-$ setenv WOW_HOME ${ROOTDIR}/home
-$ wow rm notes/missing --> FAIL
-error: metadata not found

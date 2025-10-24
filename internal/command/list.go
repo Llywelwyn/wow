@@ -11,10 +11,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
-	"github.com/llywelwyn/wow/internal/config"
-	"github.com/llywelwyn/wow/internal/model"
-	"github.com/llywelwyn/wow/internal/storage"
-	"github.com/llywelwyn/wow/internal/ui"
+	"github.com/llywelwyn/pda/internal/config"
+	"github.com/llywelwyn/pda/internal/model"
+	"github.com/llywelwyn/pda/internal/storage"
+	"github.com/llywelwyn/pda/internal/ui"
 )
 
 type ListCmd struct {

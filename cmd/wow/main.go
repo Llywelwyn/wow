@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/llywelwyn/wow/internal/command"
-	"github.com/llywelwyn/wow/internal/config"
+	"github.com/llywelwyn/pda/internal/command"
+	"github.com/llywelwyn/pda/internal/config"
 
 	"github.com/alecthomas/kong"
 )
@@ -18,7 +18,7 @@ func main() {
 	}
 }
 
-var Wow struct {
+var pda struct {
 	Save   command.SaveCmd   `cmd:"1" aliases:"s" help:"Save a snippet."`
 	Get    command.GetCmd    `cmd:"1" aliases:"g" help:"Get a snippet."`
 	Edit   command.EditCmd   `cmd:"1" aliases:"e" help:"Edit a snippet."`
@@ -34,7 +34,7 @@ func root() error {
 	defer cfg.DB.Close()
 
 	description := `
- wow! a tool for code snippets
+ pda! a tool for code snippets
 
  ██     ██  ██████  ██     ██
  ██     ██ ██    ██ ██     ██
@@ -51,7 +51,7 @@ func root() error {
  pass in one argument per command, so if you need to specify more,
  just write your flags separately.`
 
-	ctx := kong.Must(&Wow, kong.Description(description), kong.Bind(cfg))
+	ctx := kong.Must(&pda, kong.Description(description), kong.Bind(cfg))
 
 	args := os.Args[1:]
 	piped, _ := stdinHasData()

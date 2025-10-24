@@ -1,4 +1,4 @@
-// key manages wow keys.
+// key manages pda keys.
 // It handles the normalisation and validation of raw input keys,
 // and it resolves normalised keys to their absolute filepaths.
 package key

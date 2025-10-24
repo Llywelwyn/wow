@@ -7,9 +7,9 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/llywelwyn/wow/internal/config"
-	"github.com/llywelwyn/wow/internal/key"
-	"github.com/llywelwyn/wow/internal/storage"
+	"github.com/llywelwyn/pda/internal/config"
+	"github.com/llywelwyn/pda/internal/key"
+	"github.com/llywelwyn/pda/internal/storage"
 )
 
 type EditCmd struct {

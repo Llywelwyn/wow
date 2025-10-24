@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// GetEditorFromEnv resolves the editor executable using WOW_EDITOR, EDITOR, or a nano fallback.
+// GetEditorFromEnv resolves the editor executable using PDA_EDITOR, EDITOR, or a nano fallback.
 func GetEditorFromEnv() string {
-	if cmd := strings.TrimSpace(os.Getenv("WOW_EDITOR")); cmd != "" {
+	if cmd := strings.TrimSpace(os.Getenv("PDA_EDITOR")); cmd != "" {
 		return cmd
 	}
 	if cmd := strings.TrimSpace(os.Getenv("EDITOR")); cmd != "" {

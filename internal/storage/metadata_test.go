@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/llywelwyn/wow/internal/model"
+	"github.com/llywelwyn/pda/internal/model"
 )
 
 func TestInsertAndGetMetadata(t *testing.T) {

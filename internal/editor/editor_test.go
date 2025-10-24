@@ -2,8 +2,8 @@ package editor
 
 import "testing"
 
-func TestCommandPrefersWOWEditor(t *testing.T) {
-	t.Setenv("WOW_EDITOR", "code")
+func TestCommandPreferspdaEditor(t *testing.T) {
+	t.Setenv("PDA_EDITOR", "code")
 	t.Setenv("EDITOR", "vim")
 
 	if got := GetEditorFromEnv(); got != "code" {
@@ -12,7 +12,7 @@ func TestCommandPrefersWOWEditor(t *testing.T) {
 }
 
 func TestCommandFallsBackToEditor(t *testing.T) {
-	t.Setenv("WOW_EDITOR", "")
+	t.Setenv("PDA_EDITOR", "")
 	t.Setenv("EDITOR", "vim")
 
 	if got := GetEditorFromEnv(); got != "vim" {
@@ -21,7 +21,7 @@ func TestCommandFallsBackToEditor(t *testing.T) {
 }
 
 func TestCommandDefault(t *testing.T) {
-	t.Setenv("WOW_EDITOR", "")
+	t.Setenv("PDA_EDITOR", "")
 	t.Setenv("EDITOR", "")
 
 	if got := GetEditorFromEnv(); got != "nano" {
