@@ -4,15 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/llywelwyn/wow/internal/command"
 	"github.com/llywelwyn/wow/internal/config"
-	"github.com/llywelwyn/wow/internal/editor"
-	"github.com/llywelwyn/wow/internal/opener"
-	"github.com/llywelwyn/wow/internal/pager"
-	"github.com/llywelwyn/wow/internal/runner"
-	"github.com/llywelwyn/wow/internal/storage"
 
 	"github.com/alecthomas/kong"
 )
@@ -25,40 +19,11 @@ func main() {
 }
 
 var Wow struct {
-	Save   SaveCmd           `cmd:"1" aliases:"s" help:"Save a snippet."`
-	Get    GetCmd            `cmd:"1" aliases:"g" help:"Get a snippet."`
+	Save   command.SaveCmd   `cmd:"1" aliases:"s" help:"Save a snippet."`
+	Get    command.GetCmd    `cmd:"1" aliases:"g" help:"Get a snippet."`
 	Edit   command.EditCmd   `cmd:"1" aliases:"e" help:"Edit a snippet."`
-	Open   OpenCmd           `cmd:"1" aliases:"o" help:"Open a snippet."`
 	List   command.ListCmd   `cmd:"1" aliases:"l,ls" help:"List snippets."`
 	Remove command.RemoveCmd `cmd:"1" aliases:"r,rm" help:"Remove a snippet."`
-}
-
-type SaveCmd struct {
-	Key string `arg:"" optional:"" name:"key" help:"Snippet key."`
-	Tag string `help:"Comma-separated tags to add."`
-}
-
-func (c *SaveCmd) Run(ctx *kong.Context) error {
-	return nil
-}
-
-type GetCmd struct {
-	Key   string `arg:"" name:"key" help:"Snippet key."`
-	Tag   string `help:"Comma-separated tags to add."`
-	Untag string `help:"Comma-separated tags to remove."`
-}
-
-func (c *GetCmd) Run(ctx *kong.Context) error {
-	return nil
-}
-
-type OpenCmd struct {
-	Key   string `arg:"" name:"key" help:"Snippet key."`
-	Pager bool   `help:"Prefer a CLI pager to xdg-open."`
-}
-
-func (c *OpenCmd) Run(ctx *kong.Context) error {
-	return nil
 }
 
 func root() error {
@@ -66,23 +31,7 @@ func root() error {
 	if err != nil {
 		return err
 	}
-
-	db, err := storage.InitMetaDB(cfg.MetaDB)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	cmdCfg := command.Config{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
-		Input:   os.Stdin,
-		Output:  os.Stdout,
-		Clock:   time.Now,
-		Editor:  runner.Run(editor.GetEditorFromEnv()),
-		Opener:  runner.Run(opener.GetOpenerFromEnv()),
-		Pager:   runner.Run(pager.GetPagerFromEnv()),
-	}
+	defer cfg.DB.Close()
 
 	description := `
  wow! a tool for code snippets
@@ -102,7 +51,7 @@ func root() error {
  pass in one argument per command, so if you need to specify more,
  just write your flags separately.`
 
-	ctx := kong.Must(&Wow, kong.Description(description), kong.Bind(cmdCfg))
+	ctx := kong.Must(&Wow, kong.Description(description), kong.Bind(cfg))
 
 	args := os.Args[1:]
 	piped, _ := stdinHasData()
@@ -133,78 +82,6 @@ func run() error {
 	root()
 
 	return nil
-
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-
-	db, err := storage.InitMetaDB(cfg.MetaDB)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	dispatcher := command.NewDispatcher()
-
-	cmdCfg := command.Config{
-		BaseDir: cfg.BaseDir,
-		DB:      db,
-		Input:   os.Stdin,
-		Output:  os.Stdout,
-		Clock:   time.Now,
-		Editor:  runner.Run(editor.GetEditorFromEnv()),
-		Opener:  runner.Run(opener.GetOpenerFromEnv()),
-		Pager:   runner.Run(pager.GetPagerFromEnv()),
-	}
-
-	saveCmd := command.NewSaveCommand(cmdCfg)
-	getCmd := command.NewGetCommand(cmdCfg)
-	openCmd := command.NewOpenCommand(cmdCfg)
-
-	dispatcher.Register(saveCmd, "s")
-	dispatcher.Register(getCmd, "g")
-	dispatcher.Register(openCmd, "o")
-
-	// os.Args[0] is this script. Take the rest.
-	args := os.Args[1:]
-
-	piped, err := stdinHasData()
-	if err != nil {
-		return err
-	}
-
-	// If no args, check for stdin to save implicitly.
-	// Otherwise just print usage.
-	if len(args) == 0 {
-		if piped {
-			// Implicit save with auto-generated key.
-			return saveCmd.Execute(nil)
-		}
-		printUsage()
-		return nil
-	}
-
-	if args[0] == "--help" || args[0] == "-h" {
-		printUsage()
-		return nil
-	}
-
-	// Check for explicit command in args[0]
-	// and execute if a match is found.
-	if cmd, ok := dispatcher.Lookup(args[0]); ok {
-		// wow ls --verbose
-		// wow edit <key>
-		return cmd.Execute(args[1:])
-	}
-
-	// Implicit save or get based on stdin presence.
-	if piped {
-		// echo "func foo() {}" | wow go/foo
-		// wow go/bar < bar.go
-		return saveCmd.Execute(args)
-	}
-	return getCmd.Execute(args)
 }
 
 func stdinHasData() (bool, error) {
@@ -216,29 +93,4 @@ func stdinHasData() (bool, error) {
 		return false, err
 	}
 	return info.Mode()&os.ModeCharDevice == 0, nil
-}
-
-func printUsage() {
-
-	fmt.Fprintf(os.Stdout, `Usage:
-  wow get    <key> [--tag str] [--untag str] [@tag] [-@tag]  Get a snippet.
-  wow save   <key> [--tag str] [--desc str] [@tag]           Save a snippet.
-  wow open   <key> [--pager]                                 Open a snippet. 
-  wow edit   <key>                                           Edit a snippet.
-  wow remove <key>                                           Remove a snippet.
-  wow list [--limit int] [--page int] [--plain] [--verbose]  List snippets. 
-           [--tags] [--type] [--desc] [--dates] [--all]
-  wow help [command]                                         Get specific help.
-  
-  Run any command with --help for more info.
-
-  Many flags support being written in shorthand, by using one dash
-  and (usually) the first letter of the flag name. Shorthand flags
-  can be combined by writing the letters together in any order. If
-  a flag takes a value, it needs to be written last — you can only
-  pass in one argument per command, so if you need to specify more,
-  just write your flags separately.
-
-  For example: "wow list -tdl 2" is --tags, --desc, and --limit 2.
-`)
 }

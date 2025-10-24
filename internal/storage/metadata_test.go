@@ -11,7 +11,7 @@ import (
 
 func TestInsertAndGetMetadata(t *testing.T) {
 	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "meta.db")
+	dbPath := filepath.Join(t.TempDir(), ".meta.db")
 
 	db, err := InitMetaDB(dbPath)
 	if err != nil {

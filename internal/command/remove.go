@@ -6,6 +6,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/storage"
 )
@@ -14,7 +15,7 @@ type RemoveCmd struct {
 	Key string `arg:"" name:"key" help:"Snippet key."`
 }
 
-func (c *RemoveCmd) Run(ctx *kong.Context, cfg Config) error {
+func (c *RemoveCmd) Run(ctx *kong.Context, cfg config.Config) error {
 	normalizedKey, err := key.Normalize(c.Key)
 	if err != nil {
 		fmt.Fprintln(cfg.Output, err)

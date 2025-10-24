@@ -22,7 +22,7 @@ func (m *Metadata) Formatted(name string) string {
 		return m.DateStr()
 	case "Type":
 		return m.TypeStr()
-	case "Name":
+	case "Id":
 		return m.NameStr()
 	case "Tags":
 		return m.TagsStr()

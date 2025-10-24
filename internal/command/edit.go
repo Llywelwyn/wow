@@ -7,6 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/storage"
 )
@@ -15,7 +16,7 @@ type EditCmd struct {
 	Key string `arg:"" name:"key" help:"Snippet key."`
 }
 
-func (c *EditCmd) Run(kong *kong.Context, cfg Config) error {
+func (c *EditCmd) Run(kong *kong.Context, cfg config.Config) error {
 	ctx := context.Background()
 	// Resolve path and ensure it exists in the DB.
 	normalizedKey, err := key.Normalize(c.Key)

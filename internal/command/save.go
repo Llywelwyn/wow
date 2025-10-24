@@ -3,178 +3,90 @@ package command
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
-	"time"
 
-	flag "github.com/spf13/pflag"
+	"github.com/alecthomas/kong"
 
+	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/key"
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/storage"
+	"github.com/llywelwyn/wow/internal/ui"
 )
 
-// SaveCommand persists snippet content read from stdin and prints the resolved key.
-type SaveCommand struct {
-	BaseDir string
-	DB      *sql.DB
-	Now     func() time.Time
-	Input   io.Reader
-	Output  io.Writer
+type SaveCmd struct {
+	Desc []string `arg:"" optional:""`
+	Tag  []string `help:"Comma-separated tags to add."`
 }
 
-// ErrSnippetExists indicates a save attempted to overwrite an existing snippet.
-var ErrSnippetExists = errors.New("snippet already exists")
+func (c *SaveCmd) Run(kong *kong.Context, cfg config.Config) error {
+	ctx := context.Background()
 
-// NewSaveCommand constructs a SaveCommand using default dependencies from cfg.
-func NewSaveCommand(cfg Config) *SaveCommand {
-	return &SaveCommand{
-		BaseDir: cfg.BaseDir,
-		DB:      cfg.DB,
-		Now:     cfg.clock(),
-		Input:   cfg.reader(),
-		Output:  cfg.writer(),
-	}
-}
-
-// Name returns the command keyword for explicit invocation.
-func (c *SaveCommand) Name() string {
-	return "save"
-}
-
-// Execute saves the snippet using the provided arguments.
-func (c *SaveCommand) Execute(args []string) error {
-	if c.DB == nil || c.Now == nil || c.Input == nil || c.Output == nil || strings.TrimSpace(c.BaseDir) == "" {
-		return errors.New("save command not fully configured")
-	}
-
-	tagArgs := extractTagArgs(args)
-	args = tagArgs.Others
-
-	fs := flag.NewFlagSet("save", flag.ContinueOnError)
-	fs.SetOutput(c.Output)
-	var tee *bool = fs.BoolP("tee", "T", false, "print stdin back out, rather than the key")
-	var desc *string = fs.StringP("desc", "d", "", "description")
-	var tags *string = fs.StringP("tag", "t", "", "comma-separated tags, e.g. one,two")
-	var help *bool = fs.BoolP("help", "h", false, "display help")
-
-	var keyArg string
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		keyArg = args[0]
-		args = args[1:]
-	}
-
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-
-	if *help {
-		fmt.Fprintln(c.Output, `Usage:
-  wow save [key] [--desc description] [--tag tags] [@tag ...] < snippet`)
-		fs.PrintDefaults()
-		return nil
-	}
-
-	addTags := append(splitTags(*tags), tagArgs.Add...)
-
-	resolvedKey, contents, err := c.saveSnippet(context.Background(), saveRequest{
-		Key:         keyArg,
-		Description: *desc,
-		Tags:        addTags,
-	})
+	payload, err := io.ReadAll(cfg.Input)
 	if err != nil {
-		return err
-	}
-
-	output := resolvedKey
-	if *tee {
-		output = string(contents)
-	}
-	if _, err := fmt.Fprintln(c.Output, output); err != nil {
-		return fmt.Errorf("write key to output: %w", err)
-	}
-	return nil
-}
-
-type saveRequest struct {
-	Key         string
-	Description string
-	Tags        []string
-}
-
-func (c *SaveCommand) saveSnippet(ctx context.Context, req saveRequest) (string, []byte, error) {
-	payload, err := io.ReadAll(c.Input)
-	if err != nil {
-		return "", nil, fmt.Errorf("read input: %w", err)
+		return fmt.Errorf("read stdin: %w", err)
 	}
 	if len(payload) == 0 {
-		return "", nil, errors.New("snippet content is empty")
+		return errors.New("snippet content is empty")
 	}
 
-	now := c.Now().UTC()
-	contentType := detectSnippetType(payload)
+	now := cfg.Clock().UTC()
+	snippetType := detectSnippetType(payload)
 
-	resolvedKey, err := c.resolveKey(req.Key, now)
+	nextId, err := cfg.NextId()
 	if err != nil {
-		return "", nil, err
+		return fmt.Errorf("generate key: %w", err)
 	}
+	id := strconv.Itoa(nextId)
 
-	path, err := key.ResolvePath(c.BaseDir, resolvedKey)
+	path, err := key.ResolvePath(cfg.BaseDir, id)
 	if err != nil {
-		return "", nil, err
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	exists, err := storage.Exists(path)
 	if err != nil {
-		return "", nil, err
+		return fmt.Errorf("check snippet exists: %w", err)
 	}
 	if exists {
-		return "", nil, ErrSnippetExists
+		return errors.New("snippet with that ID already exists")
 	}
 
 	if err := storage.Save(path, bytes.NewReader(payload)); err != nil {
-		return "", nil, err
+		return fmt.Errorf("save snippt: %w", err)
 	}
 
-	meta := model.Metadata{
-		Key:         resolvedKey,
-		Type:        contentType,
-		Created:     now,
+	metadata := model.Metadata{
+		Key:         id,
+		Type:        snippetType,
 		Modified:    now,
-		Description: req.Description,
-		Tags:        mergeTags("", req.Tags, nil),
+		Description: strings.Join(c.Desc, " "),
+		Tags:        strings.Join(c.Tag, ","),
 	}
 
-	if err := storage.InsertMetadata(ctx, c.DB, meta); err != nil {
+	if err := storage.InsertMetadata(ctx, cfg.DB, metadata); err != nil {
 		_ = storage.Delete(path)
 		if errors.Is(err, storage.ErrMetadataDuplicate) {
-			return "", nil, ErrSnippetExists
+			return errors.New("snippet with that ID already exists")
 		}
-		return "", nil, err
+		return fmt.Errorf("insert metadata: %w", err)
 	}
 
-	return resolvedKey, payload, nil
+	fmt.Fprintln(cfg.Output, c.makeSaveOutput(metadata))
+
+	return nil
 }
 
-func (c *SaveCommand) resolveKey(rawKey string, now time.Time) (string, error) {
-	if strings.TrimSpace(rawKey) != "" {
-		return rawKey, nil
+func (c *SaveCmd) makeSaveOutput(metadata model.Metadata) string {
+	styles := ui.GetStyles()
+	desc := "snippet"
+	if metadata.Description != "" {
+		desc = fmt.Sprintf("'%s'", metadata.Description)
 	}
-
-	cb := func(candidate string) (bool, error) {
-		path, err := key.ResolvePath(c.BaseDir, candidate)
-		if err != nil {
-			return false, err
-		}
-		return storage.Exists(path)
-	}
-
-	autoKey, err := key.GenerateAuto(now, cb)
-	if err != nil {
-		return "", err
-	}
-	return autoKey, nil
+	res := fmt.Sprintf("Saved %s with ID: %s", styles.Primary.Render(desc), styles.Key.Render(metadata.Key))
+	return res
 }

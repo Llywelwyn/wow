@@ -1,7 +1,7 @@
-Output save.gif
+Output gif/000save.gif
 
-Source CONFIG.tape
-Source SET_ENVS.tape
+Source "_config.tape"
+Source "_set_envs.tape"
 
 Sleep 500ms
 Type 'echo "You can specify a key." | wow howto/save'
@@ -43,4 +43,3 @@ Type 'echo "So use the tee flag" | wow baz --tee'
 Sleep 500ms
 Enter
 Sleep 2s
-

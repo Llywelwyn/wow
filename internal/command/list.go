@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
+	"github.com/llywelwyn/wow/internal/config"
 	"github.com/llywelwyn/wow/internal/model"
 	"github.com/llywelwyn/wow/internal/storage"
 	"github.com/llywelwyn/wow/internal/ui"
@@ -18,9 +19,9 @@ import (
 
 type ListCmd struct {
 	PreviewLines  int     `short:"n" default:"0" name:"Preview" help:"Number of lines to preview from snippets."`
-	Tags          bool    `short:"t" help:"Display tags."`
-	Date          bool    `short:"D" negatable:"" default:"true" help:"Display creation and last-modified dates."`
-	Desc          bool    `short:"d" help:"Display description."`
+	Tags          bool    `short:"t" negatable:"" default:"true" help:"Display tags."`
+	Date          bool    `short:"D" help:"Display creation and last-modified dates."`
+	Desc          bool    `short:"d" negatable:"" default:"true" help:"Display description."`
 	Type          bool    `short:"T" help:"Display type."`
 	Verbose       bool    `short:"v" help:"Display all metadata."`
 	Limit         int     `short:"l" default:"50" help:"Number of snippets per page."`
@@ -61,10 +62,10 @@ func (c *Columns) SetWidths(list []model.Metadata) {
 			col.Width = max(col.Width, len(entry.TagsStr()))
 			c.Column["Tags"] = col
 		}
-		if c.Column["Name"].Shown {
-			col := c.Column["Name"]
+		if c.Column["Id"].Shown {
+			col := c.Column["Id"]
 			col.Width = max(col.Width, len(entry.NameStr()))
-			c.Column["Name"] = col
+			c.Column["Id"] = col
 		}
 		if c.Column["Desc"].Shown {
 			col := c.Column["Desc"]
@@ -80,7 +81,7 @@ type Column struct {
 	Shown  bool
 }
 
-func (c *ListCmd) Run(kong *kong.Context, cfg Config) error {
+func (c *ListCmd) Run(kong *kong.Context, cfg config.Config) error {
 	if c.Limit < 0 {
 		return errors.New("limit must be >= 0")
 	}
@@ -106,8 +107,8 @@ func (c *ListCmd) Run(kong *kong.Context, cfg Config) error {
 			"Type": {
 				Header: "Type",
 				Width:  0, Shown: c.Type || c.Verbose},
-			"Name": {
-				Header: "Name",
+			"Id": {
+				Header: "Id",
 				Width:  0,
 				Shown:  true},
 			"Tags": {
@@ -119,19 +120,16 @@ func (c *ListCmd) Run(kong *kong.Context, cfg Config) error {
 				Width:  0,
 				Shown:  c.Desc || c.Verbose},
 		},
-		Order: []string{"Date", "Type", "Name", "Tags", "Desc"},
+		Order: []string{"Date", "Type", "Id", "Tags", "Desc"},
 	}
 
 	c.BaseDir = cfg.BaseDir
-
 	ctx := context.Background()
-
 	listings, err := storage.ListMetadata(ctx, cfg.DB)
 	if err != nil {
 		return err
 	}
 	listings = c.paginate(listings)
-
 	c.Columns.SetWidths(listings)
 
 	c.print(cfg.Output, listings)
@@ -163,10 +161,7 @@ func (c *ListCmd) paginate(listings []model.Metadata) []model.Metadata {
 	}
 
 	// Get our end index, clamped to c.TotalListings.
-	end := start + c.Limit
-	if end > c.TotalListings {
-		end = c.TotalListings
-	}
+	end := min(start+c.Limit, c.TotalListings)
 
 	return listings[start:end]
 }
@@ -293,7 +288,7 @@ func (c *ListCmd) getColumnStyle(styles ui.Styles, name string, width, maxWidth 
 		style = styles.Body
 	case "Type":
 		style = styles.Muted
-	case "Name":
+	case "Id":
 		style = styles.Heading
 	case "Tags":
 		style = styles.Tag

@@ -94,7 +94,7 @@ func validateSegment(seg string) error {
 // isAllowed reports whether the rune is permitted in a key segment.
 func isAllowed(r rune) bool {
 	switch {
-	case r == '-', r == '_', r == '.':
+	case r == '-', r == '_':
 		return true
 	case r == '/':
 		return false
